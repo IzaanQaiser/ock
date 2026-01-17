@@ -16,6 +16,10 @@ class AppViewModel: ObservableObject {
     func startSession() {
         appState = .materials
     }
+
+    func goToTestEnvironment() {
+        appState = .testEnvironment
+    }
     
     func completeMaterials(_ uploadedMaterials: [UploadedMaterial]) {
         materials = uploadedMaterials

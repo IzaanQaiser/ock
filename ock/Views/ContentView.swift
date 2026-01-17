@@ -18,9 +18,22 @@ struct ContentView: View {
             Group {
                 switch appViewModel.appState {
                 case .landing:
-                    LandingView(onStartSession: {
-                        appViewModel.startSession()
-                    })
+                    LandingView(
+                        onStartSession: {
+                            appViewModel.startSession()
+                        },
+                        onGoToTestEnv: {
+                            appViewModel.goToTestEnvironment()
+                        }
+                    )
+                    .transition(.opacity)
+
+                case .testEnvironment:
+                    TestEnvironmentView(
+                        onBack: {
+                            appViewModel.goBack()
+                        }
+                    )
                     .transition(.opacity)
                     
                 case .materials:

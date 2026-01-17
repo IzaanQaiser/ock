@@ -9,6 +9,7 @@ import Foundation
 
 enum AppState {
     case landing
+    case testEnvironment
     case materials
     case session
 }

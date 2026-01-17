@@ -9,6 +9,7 @@ import SwiftUI
 
 struct LandingView: View {
     let onStartSession: () -> Void
+    let onGoToTestEnv: () -> Void
     @State private var isHovering = false
     
     var body: some View {
@@ -69,28 +70,45 @@ struct LandingView: View {
                         .frame(maxWidth: 512)
                         .padding(.bottom, 48)
                     
-                    // CTA Button
-                    Button(action: onStartSession) {
-                        HStack(spacing: 8) {
-                            Text("Start a session")
-                                .font(.body.weight(.medium))
-                            Image(systemName: "arrow.right")
-                                .font(.system(size: 20))
-                                .offset(x: isHovering ? 2 : 0)
+                    // CTA Buttons
+                    HStack(spacing: 12) {
+                        Button(action: onStartSession) {
+                            HStack(spacing: 8) {
+                                Text("Start a session")
+                                    .font(.body.weight(.medium))
+                                Image(systemName: "arrow.right")
+                                    .font(.system(size: 20))
+                                    .offset(x: isHovering ? 2 : 0)
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 32)
+                            .frame(height: 56)
+                            .background(Color.white)
+                            .cornerRadius(12)
                         }
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 32)
-                        .frame(height: 56)
-                        .background(Color.white)
-                        .cornerRadius(12)
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { hovering in
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            isHovering = hovering
+                        .buttonStyle(.plain)
+                        .onHover { hovering in
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                isHovering = hovering
+                            }
                         }
+                        .opacity(isHovering ? 0.9 : 1.0)
+
+                        Button(action: onGoToTestEnv) {
+                            HStack(spacing: 8) {
+                                Text("Go to Test Env")
+                                    .font(.body.weight(.medium))
+                            }
+                            .foregroundColor(.appForeground)
+                            .padding(.horizontal, 24)
+                            .frame(height: 56)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.appMutedForeground, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .opacity(isHovering ? 0.9 : 1.0)
                     
                     // Features hint
                     HStack(spacing: 32) {
@@ -124,7 +142,48 @@ struct FeatureHint: View {
     }
 }
 
+struct TestEnvironmentView: View {
+    let onBack: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Button(action: onBack) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16))
+                        Text("Back")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.appMutedForeground)
+                }
+                .buttonStyle(.plain)
+
+                Spacer()
+            }
+            .padding()
+
+            Spacer()
+
+            VStack(spacing: 12) {
+                Text("Test Environment")
+                    .font(.system(size: 32, weight: .medium))
+                    .foregroundColor(.appForeground)
+                Text("Use this space to try out APIs and sponsor integrations.")
+                    .font(.body)
+                    .foregroundColor(.appMutedForeground)
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 32)
+    }
+}
+
 #Preview {
-    LandingView(onStartSession: {})
+    LandingView(
+        onStartSession: {},
+        onGoToTestEnv: {}
+    )
         .frame(width: 1280, height: 800)
 }
