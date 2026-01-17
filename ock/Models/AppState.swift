@@ -7,8 +7,9 @@
 
 import Foundation
 
-enum AppState {
+enum AppState: Equatable {
     case landing
+    case projectsHub
     case materials
-    case session
+    case session(projectId: String)
 }
