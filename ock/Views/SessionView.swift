@@ -26,36 +26,58 @@ struct SessionView: View {
             )
             
             // Main content - dynamic layout
-            if viewModel.showReferencesPanel && !materials.isEmpty {
-                // Split view: References on left, Chat on right
-                HStack(spacing: 0) {
-                    // References panel
-                    ReferencesPanel(
-                        materials: materials,
-                        activeReferences: viewModel.activeReferences,
-                        onClose: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                viewModel.showReferencesPanel = false
+            if let previewedFileName = viewModel.previewedFileName,
+               let material = materials.first(where: { $0.name == previewedFileName }) {
+                // Split view: 60% PDF preview, 40% Chat
+                GeometryReader { geometry in
+                    HStack(spacing: 0) {
+                        // PDF preview panel (60%)
+                        ReferencesPanel(
+                            materials: materials,
+                            activeReferences: viewModel.activeReferences,
+                            previewedFileName: viewModel.previewedFileName,
+                            onClose: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.closePreview()
+                                }
+                            },
+                            onClosePreview: {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    viewModel.closePreview()
+                                }
                             }
-                        }
-                    )
-                    
-                    Divider()
-                    
-                    // Chat panel (full height)
-                    ChatPanel(
-                        messages: viewModel.messages,
-                        inputValue: $viewModel.inputValue,
-                        isListening: viewModel.isListening,
-                        isTyping: viewModel.isTyping,
-                        isSharing: viewModel.isSharing,
-                        onToggleListening: {
-                            viewModel.toggleListening()
-                        },
-                        onSendMessage: {
-                            viewModel.sendMessage(materials: materials)
-                        }
-                    )
+                        )
+                        .frame(width: geometry.size.width * 0.6)
+                        
+                        Divider()
+                        
+                        // Chat panel (40%)
+                        ChatPanel(
+                            messages: viewModel.messages,
+                            inputValue: $viewModel.inputValue,
+                            isListening: viewModel.isListening,
+                            isTyping: viewModel.isTyping,
+                            isSharing: viewModel.isSharing,
+                            onToggleListening: {
+                                viewModel.toggleListening()
+                            },
+                            onSendMessage: {
+                                viewModel.sendMessage(materials: materials)
+                            },
+                            onReferenceClick: { fileName in
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    if viewModel.previewedFileName == fileName {
+                                        // If clicking the same file, close it
+                                        viewModel.closePreview()
+                                    } else {
+                                        // Open the preview
+                                        viewModel.openPreview(fileName: fileName)
+                                    }
+                                }
+                            }
+                        )
+                        .frame(width: geometry.size.width * 0.4)
+                    }
                 }
             } else {
                 // Full-width chat
@@ -70,6 +92,11 @@ struct SessionView: View {
                     },
                     onSendMessage: {
                         viewModel.sendMessage(materials: materials)
+                    },
+                    onReferenceClick: { fileName in
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewModel.openPreview(fileName: fileName)
+                        }
                     }
                 )
             }

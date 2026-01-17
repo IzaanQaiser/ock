@@ -15,8 +15,29 @@ struct ChatPanel: View {
     let isSharing: Bool
     let onToggleListening: () -> Void
     let onSendMessage: () -> Void
+    let onReferenceClick: ((String) -> Void)?
     
     @FocusState private var isInputFocused: Bool
+    
+    init(
+        messages: [ChatMessage],
+        inputValue: Binding<String>,
+        isListening: Bool,
+        isTyping: Bool,
+        isSharing: Bool,
+        onToggleListening: @escaping () -> Void,
+        onSendMessage: @escaping () -> Void,
+        onReferenceClick: ((String) -> Void)? = nil
+    ) {
+        self.messages = messages
+        self._inputValue = inputValue
+        self.isListening = isListening
+        self.isTyping = isTyping
+        self.isSharing = isSharing
+        self.onToggleListening = onToggleListening
+        self.onSendMessage = onSendMessage
+        self.onReferenceClick = onReferenceClick
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -49,7 +70,10 @@ struct ChatPanel: View {
                         }
                         
                         ForEach(messages) { message in
-                            MessageBubble(message: message)
+                            MessageBubble(
+                                message: message,
+                                onReferenceClick: onReferenceClick
+                            )
                                 .id(message.id)
                         }
                         
@@ -152,6 +176,9 @@ struct ChatPanel: View {
 
 struct MessageBubble: View {
     let message: ChatMessage
+    let onReferenceClick: ((String) -> Void)?
+    
+    @State private var hoveredReference: String? = nil
     
     var body: some View {
         HStack {
@@ -171,13 +198,32 @@ struct MessageBubble: View {
                     )
                 
                 if let references = message.references, !references.isEmpty {
-                    HStack(spacing: 4) {
-                        Image(systemName: "doc.text")
-                            .font(.system(size: 12))
-                        Text("Referenced: \(references.joined(separator: ", "))")
-                            .font(.caption2)
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(references, id: \.self) { reference in
+                            HStack(spacing: 4) {
+                                Image(systemName: "doc.text")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.appMutedForeground)
+                                Text("Referenced: ")
+                                    .font(.caption2)
+                                    .foregroundColor(.appMutedForeground)
+                                Button(action: {
+                                    onReferenceClick?(reference)
+                                }) {
+                                    Text(reference)
+                                        .font(.caption2)
+                                        .underline()
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundColor(hoveredReference == reference ? .appForeground : .appMutedForeground)
+                                .onHover { hovering in
+                                    withAnimation(.easeInOut(duration: 0.15)) {
+                                        hoveredReference = hovering ? reference : nil
+                                    }
+                                }
+                            }
+                        }
                     }
-                    .foregroundColor(.appMutedForeground)
                     .padding(.top, 8)
                     .padding(.leading, 12)
                 }
@@ -201,7 +247,8 @@ struct MessageBubble: View {
         isTyping: false,
         isSharing: true,
         onToggleListening: {},
-        onSendMessage: {}
+        onSendMessage: {},
+        onReferenceClick: nil
     )
     .frame(width: 640, height: 600)
 }

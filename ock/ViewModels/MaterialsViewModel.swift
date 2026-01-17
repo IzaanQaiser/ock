@@ -19,10 +19,19 @@ class MaterialsViewModel: ObservableObject {
         let size = Int64(resourceValues?.fileSize ?? 0)
         let type = resourceValues?.typeIdentifier ?? ""
         
+        // Start accessing security-scoped resource if needed
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+        
         let material = UploadedMaterial(
             name: url.lastPathComponent,
             type: type,
-            size: size
+            size: size,
+            fileURL: url
         )
         
         materials.append(material)

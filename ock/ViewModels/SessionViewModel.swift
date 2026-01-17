@@ -18,7 +18,7 @@ class SessionViewModel: ObservableObject {
     @Published var inputValue: String = ""
     @Published var isTyping: Bool = false
     @Published var activeReferences: [String] = []
-    @Published var showReferencesPanel: Bool = false
+    @Published var previewedFileName: String? = nil
     
     private var typingTask: DispatchWorkItem?
     
@@ -69,6 +69,38 @@ class SessionViewModel: ObservableObject {
         isListening.toggle()
     }
     
+    /// Adds a reference to a message and opens the preview if needed
+    /// - Parameter fileNames: Array of file names to reference
+    func addReferences(_ fileNames: [String]) {
+        guard !fileNames.isEmpty else { return }
+        
+        activeReferences = fileNames
+        
+        // Auto-open preview for the first reference
+        if let firstRef = fileNames.first {
+            previewedFileName = firstRef
+        }
+    }
+    
+    /// Adds an assistant message with optional references
+    /// - Parameters:
+    ///   - content: The message content
+    ///   - references: Optional array of file names to reference
+    func addAssistantMessage(content: String, references: [String]? = nil) {
+        let assistantMessage = ChatMessage(
+            role: .assistant,
+            content: content,
+            references: references
+        )
+        
+        messages.append(assistantMessage)
+        
+        // If references are provided, add them
+        if let refs = references, !refs.isEmpty {
+            addReferences(refs)
+        }
+    }
+    
     func sendMessage(materials: [UploadedMaterial]) {
         guard !inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
@@ -88,13 +120,8 @@ class SessionViewModel: ObservableObject {
         let task = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
             
+            // Dummy: randomly select a reference for demo purposes
             let refs = materials.isEmpty ? [] : [materials.randomElement()?.name ?? "Course Notes"]
-            self.activeReferences = refs
-            
-            // Show references panel if there are references
-            if !refs.isEmpty {
-                self.showReferencesPanel = true
-            }
             
             let responses = [
                 "I see what you're looking at. Let me break this down step by step...",
@@ -103,18 +130,25 @@ class SessionViewModel: ObservableObject {
                 "I can see you're stuck on that part. Let me explain it differently...",
             ]
             
-            let assistantMessage = ChatMessage(
-                role: .assistant,
+            // Use the new function to add message with references
+            self.addAssistantMessage(
                 content: responses.randomElement() ?? responses[0],
-                references: refs
+                references: refs.isEmpty ? nil : refs
             )
             
-            self.messages.append(assistantMessage)
             self.isTyping = false
         }
         
         typingTask = task
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: task)
+    }
+    
+    func openPreview(fileName: String) {
+        previewedFileName = fileName
+    }
+    
+    func closePreview() {
+        previewedFileName = nil
     }
     
     func clearSession() {
@@ -124,7 +158,7 @@ class SessionViewModel: ObservableObject {
         inputValue = ""
         isTyping = false
         activeReferences = []
-        showReferencesPanel = false
+        previewedFileName = nil
         typingTask?.cancel()
     }
 }
