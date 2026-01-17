@@ -8,19 +8,50 @@
 import Foundation
 import SwiftUI
 import Combine
+import AppKit
 
 class SessionViewModel: ObservableObject {
     @Published var isListening: Bool = false
     @Published var isSharing: Bool = false
+    @Published var hasScreenSharePermission: Bool = false
     @Published var messages: [ChatMessage] = []
     @Published var inputValue: String = ""
     @Published var isTyping: Bool = false
     @Published var activeReferences: [String] = []
+    @Published var showReferencesPanel: Bool = false
     
     private var typingTask: DispatchWorkItem?
     
+    init() {
+        checkScreenSharePermission()
+    }
+    
+    func checkScreenSharePermission() {
+        // On macOS, we check screen recording permission by trying to create a screen capture
+        // The system will show permission dialog automatically if needed
+        // For UI purposes, we'll assume permission is needed until user grants it
+        // In a real implementation, you'd check this via ScreenCaptureKit or similar
+        // For now, we'll start with false and update when sharing is toggled
+        hasScreenSharePermission = false
+    }
+    
+    func requestScreenSharePermission() {
+        // Opening System Settings to screen recording permission
+        // The actual permission request happens when screen capture is attempted
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
+            NSWorkspace.shared.open(url)
+        }
+    }
+    
     func toggleScreenShare() {
+        // When user clicks share, the system will prompt for permission if needed
+        // We'll toggle the state - actual screen capture implementation would go here
         isSharing.toggle()
+        
+        // Update permission state (in real app, check actual permission status)
+        if isSharing {
+            hasScreenSharePermission = true
+        }
         
         if isSharing && messages.isEmpty {
             // Initial greeting after a delay
@@ -47,7 +78,6 @@ class SessionViewModel: ObservableObject {
         )
         
         messages.append(userMessage)
-        let messageToSend = inputValue
         inputValue = ""
         isTyping = true
         
@@ -60,6 +90,11 @@ class SessionViewModel: ObservableObject {
             
             let refs = materials.isEmpty ? [] : [materials.randomElement()?.name ?? "Course Notes"]
             self.activeReferences = refs
+            
+            // Show references panel if there are references
+            if !refs.isEmpty {
+                self.showReferencesPanel = true
+            }
             
             let responses = [
                 "I see what you're looking at. Let me break this down step by step...",
@@ -89,6 +124,7 @@ class SessionViewModel: ObservableObject {
         inputValue = ""
         isTyping = false
         activeReferences = []
+        showReferencesPanel = false
         typingTask?.cancel()
     }
 }

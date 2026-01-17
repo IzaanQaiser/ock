@@ -10,27 +10,36 @@ import SwiftUI
 struct ReferencesPanel: View {
     let materials: [UploadedMaterial]
     let activeReferences: [String]
+    let onClose: () -> Void
     
     var body: some View {
         VStack(spacing: 0) {
-            // Panel header
+            // Panel header with close button
             HStack {
-                Text("References")
+                Text("Source Materials")
                     .font(.body.weight(.medium))
                     .foregroundColor(.appForeground)
                 
                 Spacer()
                 
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 16))
-                    .foregroundColor(.appMutedForeground)
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14))
+                        .foregroundColor(.appMutedForeground)
+                        .padding(4)
+                        .background(
+                            Circle()
+                                .fill(Color.appSecondary)
+                        )
+                }
+                .buttonStyle(.plain)
             }
             .padding(16)
             .overlay(
                 Rectangle()
                     .frame(height: 1)
                     .foregroundColor(.appBorder),
-                alignment: .top
+                alignment: .bottom
             )
             
             // References list
@@ -46,8 +55,14 @@ struct ReferencesPanel: View {
                 .padding(16)
             }
         }
-        .frame(height: 192)
+        .frame(width: 320)
         .background(Color.appBackground)
+        .overlay(
+            Rectangle()
+                .frame(width: 1)
+                .foregroundColor(.appBorder),
+            alignment: .trailing
+        )
     }
 }
 
@@ -61,10 +76,16 @@ struct ReferenceItemView: View {
                 .font(.system(size: 16))
                 .foregroundColor(.appMutedForeground)
             
-            Text(material.name)
-                .font(.body)
-                .foregroundColor(.appForeground)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(material.name)
+                    .font(.body)
+                    .foregroundColor(.appForeground)
+                    .lineLimit(2)
+                
+                Text(FileSizeFormatter.format(material.size))
+                    .font(.caption2)
+                    .foregroundColor(.appMutedForeground)
+            }
             
             Spacer()
             
@@ -74,7 +95,7 @@ struct ReferenceItemView: View {
                     .foregroundColor(.appSuccess)
             }
         }
-        .padding(8)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(isActive ? Color.white.opacity(0.1) : Color.appSecondary)
@@ -95,7 +116,8 @@ struct ReferenceItemView: View {
             UploadedMaterial(name: "Lecture Notes.pdf", type: "pdf", size: 1024 * 500),
             UploadedMaterial(name: "Textbook Chapter 3.docx", type: "docx", size: 1024 * 1024 * 2)
         ],
-        activeReferences: ["Lecture Notes.pdf"]
+        activeReferences: ["Lecture Notes.pdf"],
+        onClose: {}
     )
-    .frame(width: 640, height: 192)
+    .frame(width: 320, height: 600)
 }
