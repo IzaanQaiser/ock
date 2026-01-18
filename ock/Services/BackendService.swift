@@ -67,6 +67,53 @@ class BackendService {
         
         return false
     }
+    
+    /// Send a screenshot to the backend for Overshoot analysis
+    func analyzeScreenshot(imageBase64: String, prompt: String? = nil) async throws -> AnalysisResult {
+        guard let url = URL(string: "\(baseURL)/api/analyze") else {
+            throw BackendError.invalidURL
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 30 // Allow time for AI processing
+        
+        let body: [String: Any] = [
+            "image": imageBase64,
+            "prompt": prompt ?? "Analyze this screenshot. Identify any text, equations, diagrams, or educational content. Describe what you see and explain any concepts that might need clarification."
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw BackendError.requestFailed
+        }
+        
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            let success = json["success"] as? Bool ?? false
+            let result = json["result"] as? String
+            let error = json["error"] as? String
+            return AnalysisResult(
+                success: success,
+                result: result,
+                error: error,
+                statusCode: httpResponse.statusCode
+            )
+        }
+        
+        return AnalysisResult(success: false, result: nil, error: "Unknown error", statusCode: httpResponse.statusCode)
+    }
+}
+
+/// Result from Overshoot analysis
+struct AnalysisResult {
+    let success: Bool
+    let result: String?
+    let error: String?
+    let statusCode: Int
 }
 
 enum BackendError: Error, LocalizedError {

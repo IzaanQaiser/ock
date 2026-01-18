@@ -148,6 +148,9 @@ struct TestEnvironmentView: View {
     @State private var connectionStatus: ConnectionStatus = .unknown
     @State private var lastResponse: String = ""
     @State private var messageCount: Int = 0
+    
+    // Overshoot coordinator
+    @ObservedObject private var overshootCoordinator = OvershootCoordinator.shared
 
     enum ConnectionStatus {
         case unknown, checking, connected, disconnected
@@ -172,36 +175,36 @@ struct TestEnvironmentView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Button(action: onBack) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16))
-                        Text("Back")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.appMutedForeground)
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-                
-                // Connection status indicator
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(connectionStatus.color)
-                        .frame(width: 8, height: 8)
-                    Text(connectionStatus.text)
-                        .font(.caption)
-                        .foregroundColor(.appMutedForeground)
-                }
-            }
-            .padding()
-
-            Spacer()
-
+        ScrollView {
             VStack(spacing: 24) {
+                // Header
+                HStack {
+                    Button(action: onBack) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "chevron.left")
+                                .font(.system(size: 16))
+                            Text("Back")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.appMutedForeground)
+                    }
+                    .buttonStyle(.plain)
+
+                    Spacer()
+                    
+                    // Connection status indicator
+                    HStack(spacing: 8) {
+                        Circle()
+                            .fill(connectionStatus.color)
+                            .frame(width: 8, height: 8)
+                        Text(connectionStatus.text)
+                            .font(.caption)
+                            .foregroundColor(.appMutedForeground)
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top)
+                
                 VStack(spacing: 12) {
                     Text("Test Environment")
                         .font(.system(size: 32, weight: .medium))
@@ -217,7 +220,7 @@ struct TestEnvironmentView: View {
                         .font(.headline)
                         .foregroundColor(.appForeground)
                     
-                    Text("Make sure the backend is running:\ncd backend && npm install && npm start")
+                    Text("Make sure the backend is running:\ncd backend && npm start")
                         .font(.caption)
                         .foregroundColor(.appMutedForeground)
                         .multilineTextAlignment(.center)
@@ -258,18 +261,108 @@ struct TestEnvironmentView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    
-                    // Response display
-                    if !lastResponse.isEmpty {
-                        VStack(spacing: 8) {
-                            Text("Last Response:")
+                }
+                .padding(32)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.appBorder, lineWidth: 1)
+                        )
+                )
+                
+                // ========================================
+                // OVERSHOOT SCREENSHOT SECTION
+                // ========================================
+                VStack(spacing: 16) {
+                    HStack {
+                        Text("Overshoot Screenshot Analysis")
+                            .font(.headline)
+                            .foregroundColor(.appForeground)
+                        
+                        Spacer()
+                        
+                        // Monitoring status
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(overshootCoordinator.isMonitoring ? Color.green : Color.gray)
+                                .frame(width: 8, height: 8)
+                            Text(overshootCoordinator.isMonitoring ? "Monitoring Active" : "Monitoring Off")
                                 .font(.caption)
                                 .foregroundColor(.appMutedForeground)
-                            Text(lastResponse)
+                        }
+                    }
+                    
+                    Text("Hold the Option (⌥) key to capture a screenshot and analyze it with Overshoot AI.")
+                        .font(.caption)
+                        .foregroundColor(.appMutedForeground)
+                        .multilineTextAlignment(.center)
+                    
+                    HStack(spacing: 12) {
+                        // Start/Stop monitoring button
+                        Button(action: toggleMonitoring) {
+                            HStack(spacing: 8) {
+                                Image(systemName: overshootCoordinator.isMonitoring ? "stop.fill" : "play.fill")
+                                    .font(.system(size: 16))
+                                Text(overshootCoordinator.isMonitoring ? "Stop Monitoring" : "Start Monitoring")
+                                    .font(.body.weight(.medium))
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 20)
+                            .frame(height: 44)
+                            .background(overshootCoordinator.isMonitoring ? Color.red.opacity(0.8) : Color.green)
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Manual capture button
+                        Button(action: manualCapture) {
+                            HStack(spacing: 8) {
+                                if overshootCoordinator.isProcessing {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                } else {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 16))
+                                }
+                                Text("Capture Now")
+                                    .font(.body.weight(.medium))
+                            }
+                            .foregroundColor(.appForeground)
+                            .padding(.horizontal, 20)
+                            .frame(height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.appMutedForeground, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(overshootCoordinator.isProcessing)
+                    }
+                    
+                    // Processing indicator
+                    if overshootCoordinator.isProcessing {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Capturing and analyzing screenshot...")
+                                .font(.caption)
+                                .foregroundColor(.appMutedForeground)
+                        }
+                    }
+                    
+                    // Result display
+                    if let result = overshootCoordinator.lastResult {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("✅ Analysis Result:")
+                                .font(.caption)
+                                .foregroundColor(.appSuccess)
+                            Text(result)
                                 .font(.system(.caption, design: .monospaced))
                                 .foregroundColor(.appForeground)
                                 .padding(12)
-                                .frame(maxWidth: 400)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .background(
                                     RoundedRectangle(cornerRadius: 8)
                                         .fill(Color.appSecondary)
@@ -277,10 +370,22 @@ struct TestEnvironmentView: View {
                         }
                     }
                     
-                    if messageCount > 0 {
-                        Text("Messages sent: \(messageCount)")
-                            .font(.caption)
-                            .foregroundColor(.appMutedForeground)
+                    // Error display
+                    if let error = overshootCoordinator.lastError {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("❌ Error:")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                            Text(error)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.appForeground)
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.red.opacity(0.1))
+                                )
+                        }
                     }
                 }
                 .padding(32)
@@ -292,12 +397,32 @@ struct TestEnvironmentView: View {
                                 .stroke(Color.appBorder, lineWidth: 1)
                         )
                 )
+                
+                // Response display for backend tests
+                if !lastResponse.isEmpty {
+                    VStack(spacing: 8) {
+                        Text("Backend Response:")
+                            .font(.caption)
+                            .foregroundColor(.appMutedForeground)
+                        Text(lastResponse)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.appForeground)
+                            .padding(12)
+                            .frame(maxWidth: 500)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.appSecondary)
+                            )
+                    }
+                }
+                
+                Spacer(minLength: 32)
             }
-
-            Spacer()
         }
         .padding(.horizontal, 32)
     }
+    
+    // MARK: - Backend Functions
     
     private func checkHealth() {
         connectionStatus = .checking
@@ -340,6 +465,22 @@ struct TestEnvironmentView: View {
                     lastResponse = "❌ Error: \(error.localizedDescription)"
                 }
             }
+        }
+    }
+    
+    // MARK: - Overshoot Functions
+    
+    private func toggleMonitoring() {
+        if overshootCoordinator.isMonitoring {
+            overshootCoordinator.stopMonitoring()
+        } else {
+            overshootCoordinator.startMonitoring()
+        }
+    }
+    
+    private func manualCapture() {
+        Task {
+            await overshootCoordinator.triggerAnalysis()
         }
     }
 }
