@@ -34,6 +34,9 @@ struct ContentView: View {
                         },
                         onSelectProject: { project in
                             appViewModel.selectProject(project)
+                        },
+                        onDeleteProject: { project in
+                            appViewModel.deleteProject(project)
                         }
                     )
                     .transition(.asymmetric(

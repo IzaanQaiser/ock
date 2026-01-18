@@ -69,6 +69,15 @@ class AppViewModel: ObservableObject {
         appState = .projectsHub
     }
     
+    func deleteProject(_ project: Project) {
+        projects.removeAll { $0.id == project.id }
+        // If the deleted project was the current one, clear it
+        if currentProject?.id == project.id {
+            currentProject = nil
+        }
+        saveProjects()
+    }
+    
     // MARK: - Project Persistence
     
     private func loadProjects() {

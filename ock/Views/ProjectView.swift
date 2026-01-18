@@ -13,7 +13,7 @@ struct ProjectView: View {
     let onUpdateMaterials: ([UploadedMaterial]) -> Void
     let onBack: () -> Void
     
-    @State private var isSessionActive = true // Start with session active by default
+    @State private var isSessionActive = false // Start with session stopped
     @StateObject private var sessionViewModel = SessionViewModel()
     @StateObject private var materialsViewModel = MaterialsViewModel()
     
@@ -38,6 +38,9 @@ struct ProjectView: View {
                             sessionViewModel.clearSession()
                             onBack()
                         }
+                    },
+                    onUpdateMaterials: { updatedMaterials in
+                        onUpdateMaterials(updatedMaterials)
                     }
                 )
                 .transition(.asymmetric(
@@ -46,105 +49,126 @@ struct ProjectView: View {
                 ))
             } else {
                 // Project overview
-                HStack(spacing: 0) {
-                    // Resources panel (left side)
-                    ResourcesPanel(
-                        materials: materials,
-                        onAddMaterial: { urls in
-                            materialsViewModel.addMaterials(from: urls)
-                            materials = materialsViewModel.materials
-                            onUpdateMaterials(materials)
-                        },
-                        onRemoveMaterial: { materialId in
-                            materials.removeAll { $0.id == materialId }
-                            onUpdateMaterials(materials)
-                        }
-                    )
-                    
-                    Divider()
-                    
-                    VStack(spacing: 0) {
-                        // Project header with back button (disabled during session)
-                        ProjectHeaderView(
-                            projectName: project.name,
-                            onBack: {
-                                // Can't go back during active session
-                                if !isSessionActive {
-                                    onBack()
-                                }
-                            },
-                            canGoBack: !isSessionActive
-                        )
-                        
-                        // Project content
-                        ScrollView {
-                            VStack(spacing: 0) {
-                                Spacer()
-                                    .frame(height: 100)
-                                
-                                VStack(spacing: 32) {
-                                    // Project info
-                                    VStack(spacing: 12) {
-                                        Text(project.name)
-                                            .font(.system(size: 36, weight: .medium))
-                                            .foregroundColor(.appForeground)
-                                        
-                                        Text("\(materials.count) material\(materials.count == 1 ? "" : "s")")
-                                            .font(.body)
-                                            .foregroundColor(.appMutedForeground)
-                                    }
-                                    
-                                    // Start session button (mic on)
-                                    Button(action: {
-                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                            isSessionActive = true
-                                            // Start with mic on and overlay on by default
-                                            sessionViewModel.isListening = true
-                                            sessionViewModel.shouldShowOverlay = true
-                                            sessionViewModel.startWhisperFlowMonitoring()
-                                        }
-                                    }) {
-                                        HStack(spacing: 12) {
-                                            Image(systemName: "mic.fill")
-                                                .font(.system(size: 20))
-                                            Text("Start Voice Session")
-                                                .font(.body.weight(.medium))
-                                        }
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 32)
-                                        .frame(height: 56)
-                                        .background(Color.red)
-                                        .cornerRadius(12)
-                                    }
-                                    .buttonStyle(.plain)
-                                    
-                                    // Info text
-                                    Text("Start a voice session to begin chatting with ock about your materials")
-                                        .font(.caption)
-                                        .foregroundColor(.appMutedForeground)
-                                        .multilineTextAlignment(.center)
-                                        .frame(maxWidth: 400)
-                                }
-                                .frame(maxWidth: 600)
-                                .padding(.horizontal, 16)
-                                
-                                Spacer()
-                                    .frame(height: 100)
-                            }
+                ProjectOverviewView(
+                    project: project,
+                    materials: $materials,
+                    onUpdateMaterials: onUpdateMaterials,
+                    onBack: onBack,
+                    onStartSession: {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isSessionActive = true
+                            // Start with mic on and overlay on by default
+                            sessionViewModel.isListening = true
+                            sessionViewModel.shouldShowOverlay = true
+                            sessionViewModel.startWhisperFlowMonitoring()
                         }
                     }
-                }
-                .background(Color.appBackground)
+                )
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.95).combined(with: .opacity),
+                    removal: .scale(scale: 1.05).combined(with: .opacity)
+                ))
             }
         }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: isSessionActive)
         .onAppear {
             materialsViewModel.materials = materials
-            // Auto-start session when project view appears
-            if !sessionViewModel.isListening {
-                sessionViewModel.isListening = true
-                sessionViewModel.shouldShowOverlay = true
-                sessionViewModel.startWhisperFlowMonitoring()
+        }
+    }
+}
+
+struct ProjectOverviewView: View {
+    let project: Project
+    @Binding var materials: [UploadedMaterial]
+    let onUpdateMaterials: ([UploadedMaterial]) -> Void
+    let onBack: () -> Void
+    let onStartSession: () -> Void
+    
+    @StateObject private var materialsViewModel = MaterialsViewModel()
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            // Resources panel (left side)
+            ResourcesPanel(
+                materials: materials,
+                onAddMaterial: { urls in
+                    materialsViewModel.addMaterials(from: urls) {
+                        // Update after materials are processed
+                        materials = materialsViewModel.materials
+                        onUpdateMaterials(materials)
+                    }
+                },
+                onRemoveMaterial: { materialId in
+                    materials.removeAll { $0.id == materialId }
+                    onUpdateMaterials(materials)
+                }
+            )
+            
+            Divider()
+            
+            VStack(spacing: 0) {
+                // Project header with back button (disabled during session)
+                ProjectHeaderView(
+                    projectName: project.name,
+                    onBack: {
+                        onBack()
+                    },
+                    canGoBack: true
+                )
+                
+                // Project content
+                ScrollView {
+                    VStack(spacing: 0) {
+                        Spacer()
+                            .frame(height: 100)
+                        
+                        VStack(spacing: 32) {
+                            // Project info
+                            VStack(spacing: 12) {
+                                Text(project.name)
+                                    .font(.system(size: 36, weight: .medium))
+                                    .foregroundColor(.appForeground)
+                                
+                                Text("\(materials.count) material\(materials.count == 1 ? "" : "s")")
+                                    .font(.body)
+                                    .foregroundColor(.appMutedForeground)
+                            }
+                            
+                            // Start session button (mic on)
+                            Button(action: onStartSession) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "mic.fill")
+                                        .font(.system(size: 20))
+                                    Text("Start Voice Session")
+                                        .font(.body.weight(.medium))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 32)
+                                .frame(height: 56)
+                                .background(Color.red)
+                                .cornerRadius(12)
+                            }
+                            .buttonStyle(.plain)
+                            
+                            // Info text
+                            Text("Start a voice session to begin chatting with ock about your materials")
+                                .font(.caption)
+                                .foregroundColor(.appMutedForeground)
+                                .multilineTextAlignment(.center)
+                                .frame(maxWidth: 400)
+                        }
+                        .frame(maxWidth: 600)
+                        .padding(.horizontal, 16)
+                        
+                        Spacer()
+                            .frame(height: 100)
+                    }
+                }
             }
+        }
+        .background(Color.appBackground)
+        .onAppear {
+            materialsViewModel.materials = materials
         }
     }
 }

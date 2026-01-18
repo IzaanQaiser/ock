@@ -43,7 +43,7 @@ class MaterialsViewModel: ObservableObject {
         materials.append(material)
     }
     
-    func addMaterials(from urls: [URL]) {
+    func addMaterials(from urls: [URL], completion: (() -> Void)? = nil) {
         isExtracting = true
         
         // Process on background thread to keep UI responsive
@@ -77,6 +77,7 @@ class MaterialsViewModel: ObservableObject {
             
             DispatchQueue.main.async {
                 self?.isExtracting = false
+                completion?()
             }
         }
     }

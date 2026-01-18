@@ -16,7 +16,6 @@ struct MaterialsView: View {
     @State private var isHoveringUpload = false
     @State private var showFilePicker = false
     @State private var projectName: String = ""
-    @State private var showAdvancedSettings = false
     
     var body: some View {
         ScrollView {
@@ -47,6 +46,24 @@ struct MaterialsView: View {
                         Text("Upload lecture notes, textbooks, or slides. This helps ock understand your course context.")
                             .font(.body)
                             .foregroundColor(.appMutedForeground)
+                    }
+                    .padding(.bottom, 24)
+                    
+                    // Project Name field at the top
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Project Name")
+                            .font(.caption)
+                            .foregroundColor(.appMutedForeground)
+                        TextField("e.g., CS 101 - Data Structures", text: $projectName)
+                            .textFieldStyle(.plain)
+                            .font(.body)
+                            .foregroundColor(.appForeground)
+                            .padding(.horizontal, 12)
+                            .frame(height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.appSecondary)
+                            )
                     }
                     .padding(.bottom, 32)
                     
@@ -139,46 +156,6 @@ struct MaterialsView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 32)
-                    
-                    // Advanced Settings button
-                    Button(action: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showAdvancedSettings.toggle()
-                        }
-                    }) {
-                        HStack(spacing: 8) {
-                            Text("Advanced Settings")
-                                .font(.caption)
-                            Image(systemName: showAdvancedSettings ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 12))
-                        }
-                        .foregroundColor(.appMutedForeground)
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 16)
-                    
-                    // Advanced Settings panel
-                    if showAdvancedSettings {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("Project Name")
-                                .font(.caption.weight(.medium))
-                                .foregroundColor(.appForeground)
-                            
-                            TextField("Enter project name", text: $projectName)
-                                .textFieldStyle(.plain)
-                                .font(.body)
-                                .foregroundColor(.appForeground)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 8)
-                                .frame(height: 40)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8)
-                                        .fill(Color.appSecondary)
-                                )
-                        }
-                        .padding(.top, 16)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
                     
                     // Hint text
                     Text("Materials are optional but help ock give more relevant explanations")
