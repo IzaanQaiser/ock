@@ -10,10 +10,15 @@ import SwiftUI
 @main
 struct OckCursorApp: App {
     init() {
+        // Initialize file logger first
+        _ = FileLogger.shared
+        debugLog("🚀 OckCursorApp: Starting up...")
+        
         // Set API keys FIRST (before any service initialization)
-        print("🚀 OckCursorApp: Setting API keys...")
+        debugLog("🔑 Setting API keys...")
         GeminiService.shared.setAPIKey("***REMOVED***")
         ElevenLabsService.shared.setAPIKey("***REMOVED***")
+        TokenCompanyService.shared.setAPIKey("ttc_***REMOVED***")
         
         // Verify Gemini key was set correctly
         let verifiedKey = GeminiService.shared.getCurrentAPIKey()

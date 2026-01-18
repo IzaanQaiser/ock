@@ -122,16 +122,38 @@ What it does: Shrinks the text you send into the LLM (fewer tokens) while keepin
 How ock uses it: Compress retrieved note chunks + relevant screen text before sending to the LLM → cheaper/faster responses and room for more context.
 What you still code: document ingestion (PDF → text), chunking, embeddings/RAG retrieval, “what to include” ranking, and the policy that prevents answers outside course content.
 
-8. Targets Tracks to Win
+8. The Token Company Integration Strategy
+Track: Track 2 – Innovative Application for Compression
+We are using The Token Company's bear-1 compression model to optimize LLM input tokens.
+
+8.1 What We Compress
+| What to Compress              | Why It Matters                                                                 |
+|-------------------------------|--------------------------------------------------------------------------------|
+| WhisperFlow transcriptions    | Clean up voice-to-text before Gemini - remove filler words, redundancy         |
+| PDF course material chunks    | BIG WIN - compress the 3000+ char context from MaterialsContextService         |
+
+8.2 Why This Is a Strong Submission
+- 60% token savings on course materials = fit MORE context into Gemini's window
+- Lower cost per query (important for students)
+- Faster responses (less tokens = less latency)
+- Real, practical use case in education
+
+8.3 Implementation
+- bear-1 model via API (thetokencompany.com)
+- Create TokenCompanyService.swift to call their REST API
+- Compress context before sending to GeminiService
+- Aggressiveness parameter tunable (0.0 - 1.0)
+
+9. Targets Tracks to Win
 Education Main: $2000, $1000, $500
 Wispr Flow Sponsor: 1 Year wispr flow pro, unique key, wispr swag (2/5)
 ElevenLabs: 6 Months of ElevenLabs Scale tier (3/5)
 The Token Company: $1000, $500, $500
 
-9. Additional Things To Do
+10. Additional Things To Do
 Recommendation from Zak : expand on what this can do in the future and stuff
 
-10. v1
+11. v1
 Overlays (citations, alerts)
 Vision inference selection
 Overlay branching + elaboration

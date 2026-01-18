@@ -413,6 +413,7 @@ class SessionViewModel: ObservableObject {
     }
     
     func sendMessage(materials: [UploadedMaterial]) {
+        debugLog("📤 sendMessage called with \(materials.count) materials")
         guard !inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
         // Cancel any pending auto-send
@@ -470,9 +471,48 @@ class SessionViewModel: ObservableObject {
             print("🔮 SessionViewModel: Calling Gemini API...")
             let startTime = Date()
             
+            // Compress user's transcription/question
+            var compressedQuestion = text
+            if text.count > 50 { // Only compress if long enough
+                do {
+                    debugLog("🎤 SessionViewModel: Compressing user transcription...")
+                    debugLog("   - Original: \(text.count) chars")
+                    compressedQuestion = try await TokenCompanyService.shared.compressTranscription(text)
+                    debugLog("   - Compressed: \(compressedQuestion.count) chars")
+                } catch {
+                    debugLog("⚠️ SessionViewModel: Transcription compression failed, using original")
+                    compressedQuestion = text
+                }
+            }
+            
+            // Get relevant course context from materials
+            debugLog("📚 SessionViewModel: Checking materials for context...")
+            debugLog("   - Number of materials: \(materials.count)")
+            for (i, mat) in materials.enumerated() {
+                debugLog("   - Material \(i+1): \(mat.name)")
+                debugLog("     - Has extracted text: \(mat.extractedText != nil)")
+                debugLog("     - Text length: \(mat.extractedText?.count ?? 0) chars")
+                debugLog("     - Chunks: \(mat.textChunks?.count ?? 0)")
+            }
+            
+            let courseContext = materialsContextService.getRelevantContext(for: compressedQuestion, from: materials)
+            debugLog("📚 SessionViewModel: Context retrieval result: \(courseContext.count) chars")
+            
+            if !courseContext.isEmpty {
+                debugLog("📚 ---- RAW CONTEXT START ----")
+                debugLog(String(courseContext.prefix(1000))) // First 1000 chars to avoid flooding
+                if courseContext.count > 1000 {
+                    debugLog("... [\(courseContext.count - 1000) more chars]")
+                }
+                debugLog("📚 ---- RAW CONTEXT END ----")
+            } else {
+                debugLog("⚠️ SessionViewModel: No relevant context found from materials!")
+            }
+            
             let response = try await geminiService.generateContent(
-                text: text,
-                imageBase64: imageBase64
+                text: compressedQuestion,
+                imageBase64: imageBase64,
+                courseContext: courseContext.isEmpty ? nil : courseContext
             )
             
             let apiTime = Date().timeIntervalSince(startTime)

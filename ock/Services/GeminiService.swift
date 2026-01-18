@@ -126,8 +126,9 @@ class GeminiService: ObservableObject {
     ///   - text: The user's question/prompt
     ///   - imageBase64: Optional base64-encoded image (JPEG/PNG)
     ///   - mimeType: MIME type of the image (default: "image/jpeg")
+    ///   - courseContext: Optional course material context (will be compressed via Token Company)
     /// - Returns: Generated text response
-    func generateContent(text: String, imageBase64: String? = nil, mimeType: String = "image/jpeg") async throws -> String {
+    func generateContent(text: String, imageBase64: String? = nil, mimeType: String = "image/jpeg", courseContext: String? = nil) async throws -> String {
         // Always read directly from UserDefaults to ensure we get the latest key (no caching)
         let currentApiKey = UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
         print("🔑 GeminiService: Using API key from UserDefaults: \(String(currentApiKey.prefix(20)))...")
@@ -158,7 +159,7 @@ class GeminiService: ObservableObject {
             }
             
             do {
-                return try await makeRequest(url: url, text: text, imageBase64: imageBase64, mimeType: mimeType, modelName: modelName)
+                return try await makeRequest(url: url, text: text, imageBase64: imageBase64, mimeType: mimeType, modelName: modelName, courseContext: courseContext)
             } catch {
                 lastError = error
                 // If it's a 404 (model not found), try next model
@@ -177,11 +178,33 @@ class GeminiService: ObservableObject {
         throw lastError ?? GeminiError.apiError(statusCode: 404, message: "No available models found")
     }
     
-    private func makeRequest(url: URL, text: String, imageBase64: String?, mimeType: String, modelName: String) async throws -> String {
+    private func makeRequest(url: URL, text: String, imageBase64: String?, mimeType: String, modelName: String, courseContext: String? = nil) async throws -> String {
+        
+        // Compress course context using Token Company if provided
+        var compressedContext: String? = nil
+        if let context = courseContext, !context.isEmpty {
+            do {
+                debugLog("🗜️ GeminiService: Compressing course context with Token Company...")
+                compressedContext = try await TokenCompanyService.shared.compressCourseContext(context)
+                debugLog("   - Original: \(context.count) chars → Compressed: \(compressedContext?.count ?? 0) chars")
+                debugLog("🗜️ ---- COMPRESSED CONTEXT START ----")
+                debugLog(String(compressedContext?.prefix(800) ?? "nil"))
+                if (compressedContext?.count ?? 0) > 800 {
+                    debugLog("... [\((compressedContext?.count ?? 0) - 800) more chars]")
+                }
+                debugLog("🗜️ ---- COMPRESSED CONTEXT END ----")
+            } catch {
+                debugLog("⚠️ GeminiService: Token Company compression failed, using original context")
+                debugLog("   - Error: \(error.localizedDescription)")
+                compressedContext = context // Fallback to uncompressed
+            }
+        } else {
+            debugLog("⚠️ GeminiService: No course context provided to compress")
+        }
         
         // Build request body according to Gemini API spec
         // System prompt for casual TA behavior - keep responses SHORT
-        let systemPrompt = """
+        var systemPrompt = """
 You are a chill teaching assistant helping a student. Look at their screen and respond naturally.
 
 RULES:
@@ -190,10 +213,27 @@ RULES:
 - If they just ask what you see, briefly acknowledge it and offer help
 - Only give detailed explanations if they ask a specific question
 - No formal language, no bullet points, no lengthy explanations
+"""
+        
+        // Add compressed course context if available
+        if let context = compressedContext {
+            systemPrompt += """
+
+COURSE MATERIALS (use these to answer questions about their coursework):
+\(context)
+"""
+        }
+        
+        systemPrompt += """
 
 User says: \(text)
 """
         let promptText = systemPrompt
+        
+        // Log the full prompt for debugging
+        print("🔮 ---- FULL PROMPT TO GEMINI START ----")
+        print(promptText)
+        print("🔮 ---- FULL PROMPT TO GEMINI END ----")
         
         var parts: [[String: Any]] = [
             ["text": promptText]
