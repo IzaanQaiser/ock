@@ -23,8 +23,8 @@ class ElevenLabsService: NSObject, ObservableObject {
                 }
             }
     private let baseURL = "https://api.elevenlabs.io/v1"
-    private let defaultVoiceId = "21m00Tcm4TlvDq8ikWAM" // Default voice (Rachel)
-    private let defaultModelId = "eleven_multilingual_v2" // Eleven Multilingual v2
+    private let defaultVoiceId = "rRiBw8yThM0D5zn4ATvJ" // Custom voice
+    private let defaultModelId = "eleven_turbo_v2_5" // Fastest model (low latency)
     
     // Audio playback
     private var audioPlayer: AVAudioPlayer?
@@ -35,7 +35,7 @@ class ElevenLabsService: NSObject, ObservableObject {
         super.init()
         // Initialize with placeholder API key if not set (user should set their own key)
         if UserDefaults.standard.string(forKey: "elevenlabs_api_key") == nil {
-            UserDefaults.standard.set("YOUR_ELEVENLABS_API_KEY_HERE", forKey: "elevenlabs_api_key")
+            UserDefaults.standard.set("sk_be3b4af3b2d114d29489f3132ab416845eadfef34967a534", forKey: "elevenlabs_api_key")
             print("⚠️ ElevenLabsService: Using placeholder API key. Please set your ElevenLabs API key.")
         }
     }

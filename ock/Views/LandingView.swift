@@ -3,17 +3,15 @@
 //  Ock-Cursor
 //
 //  Created on 2024
-//
-
+//Can you read my screen and describe what you see?
 import SwiftUI
 
 struct LandingView: View {
     let onStartSession: () -> Void
     @State private var isHovering = false
-    
     var body: some View {
         ZStack {
-            // Subtle background glow
+            // Subtle background gl can you see my screen ow
             Circle()
                 .fill(Color.white.opacity(0.02))
                 .frame(width: 600, height: 600)

@@ -13,7 +13,7 @@ class GeminiService: ObservableObject {
     
             private var apiKey: String {
                 get {
-                    UserDefaults.standard.string(forKey: "gemini_api_key") ?? "YOUR_GEMINI_API_KEY_HERE"
+                    UserDefaults.standard.string(forKey: "gemini_api_key") ?? "AIzaSyDcvwCHlEqCHvOy6CRh1gjuYRUAeSbcNMc"
                 }
                 set {
                     UserDefaults.standard.set(newValue, forKey: "gemini_api_key")
@@ -161,8 +161,20 @@ class GeminiService: ObservableObject {
     private func makeRequest(url: URL, text: String, imageBase64: String?, mimeType: String, modelName: String) async throws -> String {
         
         // Build request body according to Gemini API spec
-        // Add instruction to keep responses concise
-        let promptText = "Keep your response brief and simple (under 150 words). Be direct and concise.\n\n\(text)"
+        // System prompt for casual TA behavior - keep responses SHORT
+        let systemPrompt = """
+You are a chill teaching assistant helping a student. Look at their screen and respond naturally.
+
+RULES:
+- Keep it SHORT: 1-2 sentences MAX (under 25 words)
+- Be casual and friendly, like a friend helping out
+- If they just ask what you see, briefly acknowledge it and offer help
+- Only give detailed explanations if they ask a specific question
+- No formal language, no bullet points, no lengthy explanations
+
+User says: \(text)
+"""
+        let promptText = systemPrompt
         
         var parts: [[String: Any]] = [
             ["text": promptText]
