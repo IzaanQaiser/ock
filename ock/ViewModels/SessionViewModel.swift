@@ -459,49 +459,15 @@ class SessionViewModel: ObservableObject {
             guard let self = self else { return }
             
             print("📸 sendMessage: Capturing screenshot...")
-            print("   - ScreenshotCapture.hasPermission: \(self.screenshotCapture.hasPermission)")
-            
-            // Check permission status first
-            if !self.screenshotCapture.hasPermission {
-                print("⚠️ sendMessage: Permission not granted, checking again...")
-                await self.screenshotCapture.checkAndRequestPermission()
-                
-                if !self.screenshotCapture.hasPermission {
-                    print("⚠️ sendMessage: Still no permission after check")
-                    await MainActor.run {
-                        let permissionMessage = ChatMessage(
-                            role: .assistant,
-                            content: "I couldn't capture your screen because screen recording permission is not granted. Please enable 'ock' in System Settings > Privacy & Security > Screen Recording, then restart the app. For now, I'll answer without seeing your screen."
-                        )
-                        self.messages.append(permissionMessage)
-                    }
-                    await self.callGemini(text: userQuestion, imageBase64: nil, materials: materials)
-                    return
-                }
-            }
             
             // Capture screenshot (async)
-            guard let screenshotBase64 = await self.screenshotCapture.captureScreenAsBase64(compressionQuality: 0.8) else {
-                print("⚠️ sendMessage: Failed to capture screenshot")
-                
-                // Update permission status - might have been revoked
-                await self.screenshotCapture.checkAndRequestPermission()
-                
-                // Show user-friendly message about permission
-                await MainActor.run {
-                    let permissionMessage = ChatMessage(
-                        role: .assistant,
-                        content: "I couldn't capture your screen. Please make sure screen recording permission is enabled in System Settings > Privacy & Security > Screen Recording. For now, I'll answer without seeing your screen."
-                    )
-                    self.messages.append(permissionMessage)
-                }
-                
-                // Continue without screenshot
-                await self.callGemini(text: userQuestion, imageBase64: nil, materials: materials)
-                return
-            }
+            let screenshotBase64 = await self.screenshotCapture.captureScreenAsBase64(compressionQuality: 0.7)
             
-            print("✅ sendMessage: Screenshot captured successfully")
+            if screenshotBase64 != nil {
+                print("✅ sendMessage: Screenshot captured successfully")
+            } else {
+                print("⚠️ sendMessage: Failed to capture screenshot, continuing without it")
+            }
             
             // Call Gemini with text and screenshot
             await self.callGemini(text: userQuestion, imageBase64: screenshotBase64, materials: materials)
@@ -549,13 +515,12 @@ class SessionViewModel: ObservableObject {
                         print("🔊 SessionViewModel: Starting TTS immediately after response")
                         try await self.elevenLabsService.speak(text: response, messageId: assistantMessage.id)
                         let ttsTime = Date().timeIntervalSince(ttsStartTime)
-                        print("⏱️ SessionViewModel: TTS generation took \(String(format: "%.2f", ttsTime)) seconds")
+                        print("⏱️ SessionViewModel: TTS took \(String(format: "%.2f", ttsTime)) seconds")
                         await MainActor.run {
                             self.currentPlayingMessageId = assistantMessage.id
                         }
                     } catch {
-                        print("⚠️ SessionViewModel: Failed to play TTS")
-                        print("   - Error: \(error.localizedDescription)")
+                        print("⚠️ SessionViewModel: Failed to play TTS: \(error.localizedDescription)")
                     }
                 }
                 
@@ -563,21 +528,11 @@ class SessionViewModel: ObservableObject {
             }
         } catch {
             await MainActor.run {
-                print("❌ SessionViewModel: Gemini API call failed")
-                print("   - Error: \(error.localizedDescription)")
-                
-                // Parse error for better user message
-                var userMessage = "Sorry, I encountered an error: \(error.localizedDescription)"
-                
-                if let geminiError = error as? GeminiError,
-                   case .apiError(_, let message) = geminiError {
-                    // Use the detailed error message from GeminiService (already formatted)
-                    userMessage = message
-                }
+                print("❌ SessionViewModel: Gemini API call failed: \(error.localizedDescription)")
                 
                 // Add assistant message with error
                 self.addAssistantMessage(
-                    content: userMessage,
+                    content: "Sorry, I encountered an error: \(error.localizedDescription)",
                     references: nil
                 )
                 
