@@ -90,8 +90,34 @@ struct ActiveSessionView: View {
                                             sessionViewModel.openPreview(fileName: fileName)
                                         }
                                     }
-                                }
+                                },
+                                shouldFocusInput: $sessionViewModel.shouldFocusInput
                             )
+                            .onChange(of: sessionViewModel.inputValue) { newValue in
+                                // Auto-send when text stabilizes during WhisperFlow monitoring
+                                // But only if not triggered by Fn key release
+                                if sessionViewModel.isMonitoringWhisperFlow && 
+                                   !sessionViewModel.shouldAutoSend &&
+                                   !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    // Cancel previous auto-send task
+                                    sessionViewModel.cancelAutoSend()
+                                    // Schedule new auto-send
+                                    sessionViewModel.scheduleAutoSend(materials: materials)
+                                }
+                            }
+                            .onChange(of: sessionViewModel.shouldAutoSend) { shouldSend in
+                                // Fn key was released - send message immediately
+                                if shouldSend && !sessionViewModel.inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    print("📤 ActiveSessionView: shouldAutoSend triggered, sending message...")
+                                    sessionViewModel.sendMessage(materials: materials)
+                                    sessionViewModel.shouldAutoSend = false
+                                    // Keep monitoring and overlay open for next message
+                                    // Don't stop monitoring or close overlay
+                                } else if shouldSend {
+                                    print("📤 ActiveSessionView: shouldAutoSend triggered but no text, resetting...")
+                                    sessionViewModel.shouldAutoSend = false
+                                }
+                            }
                             .frame(width: geometry.size.width * 0.4)
                         }
                     }
@@ -113,12 +139,76 @@ struct ActiveSessionView: View {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 sessionViewModel.openPreview(fileName: fileName)
                             }
-                        }
+                        },
+                        shouldFocusInput: $sessionViewModel.shouldFocusInput
                     )
+                    .onChange(of: sessionViewModel.inputValue) { newValue in
+                        // Auto-send when text stabilizes during WhisperFlow monitoring
+                        // But only if not triggered by Fn key release
+                        if sessionViewModel.isMonitoringWhisperFlow && 
+                           !sessionViewModel.shouldAutoSend &&
+                           !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            // Cancel previous auto-send task
+                            sessionViewModel.cancelAutoSend()
+                            // Schedule new auto-send
+                            sessionViewModel.scheduleAutoSend(materials: materials)
+                        }
+                    }
+                    .onChange(of: sessionViewModel.shouldAutoSend) { shouldSend in
+                        // Auto-send triggered (from typing detection or Fn release)
+                        if shouldSend && !sessionViewModel.inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            print("📤 ActiveSessionView: shouldAutoSend triggered, sending message...")
+                            sessionViewModel.sendMessage(materials: materials)
+                            sessionViewModel.shouldAutoSend = false
+                            // Keep monitoring and overlay open for next message
+                            // Don't stop monitoring or close overlay
+                        } else if shouldSend {
+                            print("📤 ActiveSessionView: shouldAutoSend triggered but no text, resetting...")
+                            sessionViewModel.shouldAutoSend = false
+                        }
+                    }
                 }
             }
         }
         .background(Color.appBackground)
+        .onChange(of: sessionViewModel.shouldShowOverlay) { shouldShow in
+            print("📱 ActiveSessionView: shouldShowOverlay changed to \(shouldShow)")
+            print("   - Current thread: \(Thread.isMainThread ? "Main" : "Background")")
+            
+            DispatchQueue.main.async {
+                if shouldShow {
+                    print("   ✅ Showing overlay window...")
+                    // Show overlay window with text field binding
+                    WhisperFlowOverlayWindowManager.shared.showOverlay(
+                        inputValue: $sessionViewModel.inputValue,
+                        onSendMessage: {
+                            print("   📤 Overlay send message triggered")
+                            sessionViewModel.sendMessage(materials: materials)
+                        }
+                    )
+                } else {
+                    print("   🛑 Closing overlay window...")
+                    // Close overlay
+                    WhisperFlowOverlayWindowManager.shared.closeOverlay()
+                }
+            }
+        }
+        .onAppear {
+            // Check if overlay should be shown on appear
+            if sessionViewModel.shouldShowOverlay {
+                print("📱 ActiveSessionView: onAppear - showing overlay")
+                WhisperFlowOverlayWindowManager.shared.showOverlay(
+                    inputValue: $sessionViewModel.inputValue,
+                    onSendMessage: {
+                        sessionViewModel.sendMessage(materials: materials)
+                    }
+                )
+            }
+        }
+        .onChange(of: sessionViewModel.shouldAutoSend) { shouldSend in
+            // Don't close overlay when sending - keep it open for next message
+            // The overlay will be cleared and refocused by sendMessage
+        }
     }
 }
 

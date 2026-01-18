@@ -17,10 +17,12 @@ struct MaterialsView: View {
     @State private var showFilePicker = false
     
     var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            
-            VStack(alignment: .leading, spacing: 0) {
+        ScrollView {
+            VStack(spacing: 0) {
+                Spacer()
+                    .frame(height: 100)
+                
+                VStack(alignment: .leading, spacing: 0) {
                     // Back button
                     Button(action: onBack) {
                         HStack(spacing: 8) {
@@ -143,8 +145,10 @@ struct MaterialsView: View {
                 }
                 .frame(maxWidth: 576)
                 .padding(.horizontal, 16)
-            
-            Spacer()
+                
+                Spacer()
+                    .frame(height: 100)
+            }
         }
     }
     
