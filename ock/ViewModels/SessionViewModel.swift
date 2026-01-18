@@ -101,11 +101,7 @@ class SessionViewModel: ObservableObject {
         print("   👆 Focusing text input...")
         shouldFocusInput = true
         
-        // Minimize the app window after a short delay to allow focus
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-            print("   📦 Minimizing window...")
-            WindowManager.minimizeCurrentWindow()
-        }
+        // Don't minimize the app - keep it visible
         
         // Update listening state
         isListening = true
@@ -207,16 +203,14 @@ class SessionViewModel: ObservableObject {
                         self.startWhisperFlowMonitoring()
                         self.isListening = true
                         
-                        // Show overlay window instead of minimizing
+                        // Show overlay window
                         // The overlay will have the focused text field that WhisperFlow can type into
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                             print("   📱 Showing WhisperFlow overlay window...")
                             // Show overlay - it will be managed by the view layer
                             // We'll trigger it via a published property
                             self.shouldShowOverlay = true
-                            
-                            // Also minimize main window
-                            WindowManager.minimizeCurrentWindow()
+                            // Don't minimize the app - keep it visible
                         }
                     }
                     
@@ -242,14 +236,12 @@ class SessionViewModel: ObservableObject {
                             print("   ✅ Auto-sending message immediately...")
                             // Trigger send via published property - the view will handle it
                             self.shouldAutoSend = true
-                            // Keep overlay open for next message (don't close it)
+                            // Keep mic on and overlay open for next message (don't close it)
+                            // User can ask multiple questions
                         } else {
                             print("   ⚠️ No text to send")
-                            if self.isMonitoringWhisperFlow {
-                                self.stopWhisperFlowMonitoring()
-                            }
-                            self.isListening = false
-                            // Keep overlay open even if no text
+                            // Keep mic on even if no text - user might try again
+                            // Don't stop monitoring or turn off mic
                         }
                         
                         self.isCurrentlyTyping = false
@@ -332,27 +324,23 @@ class SessionViewModel: ObservableObject {
         }
     }
     
-    func toggleListening() {
-        isListening.toggle()
-        
-        if isListening {
-            // Start monitoring WhisperFlow clipboard
-            startWhisperFlowMonitoring()
-            
-            // Show overlay window immediately so WhisperFlow has a text field to type into
-            print("🎤 toggleListening: Showing overlay for WhisperFlow...")
-            shouldShowOverlay = true
-            
-            // Minimize the app window after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                WindowManager.minimizeCurrentWindow()
+            func toggleListening() {
+                isListening.toggle()
+
+                if isListening {
+                    // Start monitoring WhisperFlow clipboard
+                    startWhisperFlowMonitoring()
+
+                    // Show overlay window immediately so WhisperFlow has a text field to type into
+                    print("🎤 toggleListening: Showing overlay for WhisperFlow...")
+                    shouldShowOverlay = true
+                    // Don't minimize the app - keep it visible
+                } else {
+                    // Stop monitoring and close overlay
+                    stopWhisperFlowMonitoring()
+                    shouldShowOverlay = false
+                }
             }
-        } else {
-            // Stop monitoring and close overlay
-            stopWhisperFlowMonitoring()
-            shouldShowOverlay = false
-        }
-    }
     
     
     /// Start monitoring WhisperFlow for transcriptions
@@ -435,22 +423,24 @@ class SessionViewModel: ObservableObject {
             content: inputValue
         )
         
-        let userQuestion = inputValue // Save the question before clearing
-        messages.append(userMessage)
-        inputValue = "" // Clear input for next message
-        isTyping = true
-        
-        // Keep overlay open and refocus it for next message
-        if shouldShowOverlay {
-            print("📤 sendMessage: Keeping overlay open for next message")
-            // Refocus overlay after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                // Ensure overlay is still shown and focused
-                if self.shouldShowOverlay {
-                    WhisperFlowOverlayWindowManager.shared.refocusOverlay()
+                let userQuestion = inputValue // Save the question before clearing
+                messages.append(userMessage)
+                inputValue = "" // Clear input for next message
+                isTyping = true
+
+                // Keep mic on and overlay open for next message
+                // Don't turn off listening - user can ask multiple questions
+                if shouldShowOverlay {
+                    print("📤 sendMessage: Keeping overlay open and mic on for next message")
+                    // Refocus overlay after a short delay
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                        // Ensure overlay is still shown and focused
+                        if self.shouldShowOverlay {
+                            WhisperFlowOverlayWindowManager.shared.refocusOverlay()
+                        }
+                    }
                 }
-            }
-        }
+                // Keep isListening = true so user can ask more questions
         
         // Cancel any existing typing task
         typingTask?.cancel()

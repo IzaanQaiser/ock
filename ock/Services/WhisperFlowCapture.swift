@@ -19,7 +19,9 @@ class WhisperFlowCapture: ObservableObject {
     private var lastClipboardContent: String = ""
     private var onTextCaptured: ((String) -> Void)?
     private var lastCaptureTime: Date?
+    private var monitoringStartTime: Date?
     private let minCaptureInterval: TimeInterval = 0.5 // Minimum time between captures
+    private let ignoreExistingClipboardDelay: TimeInterval = 1.0 // Ignore clipboard content that exists when monitoring starts
     
     private init() {
         // No notification available for clipboard changes on macOS, so we use polling
@@ -32,6 +34,7 @@ class WhisperFlowCapture: ObservableObject {
         isMonitoring = true
         lastClipboardContent = getClipboardText()
         lastCaptureTime = nil
+        monitoringStartTime = Date() // Record when monitoring started
         
         // Poll clipboard periodically to catch WhisperFlow transcriptions
         clipboardTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
@@ -46,10 +49,21 @@ class WhisperFlowCapture: ObservableObject {
         clipboardTimer = nil
         onTextCaptured = nil
         lastCaptureTime = nil
+        monitoringStartTime = nil
+        lastClipboardContent = "" // Reset to prevent stale content
     }
     
     private func checkClipboard() {
         guard isMonitoring else { return }
+        
+        // Ignore clipboard content that existed when monitoring started
+        // This prevents pasting existing clipboard content when opening a project
+        if let startTime = monitoringStartTime,
+           Date().timeIntervalSince(startTime) < ignoreExistingClipboardDelay {
+            // Update lastClipboardContent to current to ignore it
+            lastClipboardContent = getClipboardText()
+            return
+        }
         
         // Prevent too frequent captures
         if let lastTime = lastCaptureTime,

@@ -10,7 +10,8 @@ import SwiftUI
 struct ActiveSessionView: View {
     @Binding var materials: [UploadedMaterial]
     @ObservedObject var sessionViewModel: SessionViewModel
-    let onEndSession: () -> Void
+    let onEndSession: () -> Void // This is now only used for going back to project view, not for stopping mic
+    let onBack: () -> Void // Back to projects
     
     var body: some View {
         HStack(spacing: 0) {
@@ -33,12 +34,16 @@ struct ActiveSessionView: View {
             VStack(spacing: 0) {
                 // Header
                 SessionHeaderView(
-                    isSharing: sessionViewModel.isSharing,
-                    hasPermission: sessionViewModel.hasScreenSharePermission,
-                    onToggleShare: {
-                        sessionViewModel.toggleScreenShare()
+                    isListening: sessionViewModel.isListening,
+                    onToggleListening: {
+                        // Just toggle mic - don't change view
+                        sessionViewModel.toggleListening()
                     },
-                    onEndSession: onEndSession
+                    onEndSession: {
+                        // This is not used anymore - mic toggle handles start/stop
+                        // Keep this for potential future use or remove if not needed
+                    },
+                    onBack: onBack
                 )
                 
                 // Main content - dynamic layout
@@ -73,7 +78,6 @@ struct ActiveSessionView: View {
                                 inputValue: $sessionViewModel.inputValue,
                                 isListening: sessionViewModel.isListening,
                                 isTyping: sessionViewModel.isTyping,
-                                isSharing: sessionViewModel.isSharing,
                                 onToggleListening: {
                                     sessionViewModel.toggleListening()
                                 },
@@ -128,7 +132,6 @@ struct ActiveSessionView: View {
                         inputValue: $sessionViewModel.inputValue,
                         isListening: sessionViewModel.isListening,
                         isTyping: sessionViewModel.isTyping,
-                        isSharing: sessionViewModel.isSharing,
                         onToggleListening: {
                             sessionViewModel.toggleListening()
                         },
@@ -218,7 +221,8 @@ struct ActiveSessionView: View {
             UploadedMaterial(name: "Lecture Notes.pdf", type: "pdf", size: 1024 * 500)
         ]),
         sessionViewModel: SessionViewModel(),
-        onEndSession: {}
+        onEndSession: {},
+        onBack: {}
     )
     .frame(width: 1280, height: 800)
 }

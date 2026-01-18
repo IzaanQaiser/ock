@@ -21,7 +21,10 @@ struct ContentView: View {
                     LandingView(onStartSession: {
                         appViewModel.goToProjectsHub()
                     })
-                    .transition(.opacity)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                        removal: .scale(scale: 1.05).combined(with: .opacity)
+                    ))
                     
                 case .projectsHub:
                     ProjectsHubView(
@@ -33,18 +36,24 @@ struct ContentView: View {
                             appViewModel.selectProject(project)
                         }
                     )
-                    .transition(.opacity)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                        removal: .scale(scale: 1.05).combined(with: .opacity)
+                    ))
                     
                 case .materials:
                     MaterialsView(
-                        onComplete: { materials in
-                            appViewModel.completeMaterials(materials)
+                        onComplete: { materials, projectName in
+                            appViewModel.completeMaterials(materials, projectName: projectName)
                         },
                         onBack: {
                             appViewModel.goBack()
                         }
                     )
-                    .transition(.opacity)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.95).combined(with: .opacity),
+                        removal: .scale(scale: 1.05).combined(with: .opacity)
+                    ))
                     
                 case .session(let projectId):
                     if let project = appViewModel.currentProject ?? appViewModel.projects.first(where: { $0.id == projectId }) {
@@ -65,11 +74,14 @@ struct ContentView: View {
                                 appViewModel.goBack()
                             }
                         )
-                        .transition(.opacity)
+                        .transition(.asymmetric(
+                            insertion: .scale(scale: 0.95).combined(with: .opacity),
+                            removal: .scale(scale: 1.05).combined(with: .opacity)
+                        ))
                     }
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: appViewModel.appState)
+            .animation(.spring(response: 0.4, dampingFraction: 0.8), value: appViewModel.appState)
         }
         .frame(minWidth: 1024, minHeight: 768)
         .preferredColorScheme(.dark)

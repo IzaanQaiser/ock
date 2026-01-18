@@ -158,10 +158,6 @@ struct ProjectCard: View {
                 }
                 
                 Spacer()
-                
-                Text(project.updatedAt, style: .relative)
-                    .font(.caption2)
-                    .foregroundColor(.appMutedForeground)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)

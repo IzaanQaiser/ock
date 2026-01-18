@@ -9,12 +9,14 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct MaterialsView: View {
-    let onComplete: ([UploadedMaterial]) -> Void
+    let onComplete: ([UploadedMaterial], String) -> Void // Updated to include project name
     let onBack: () -> Void
     
     @StateObject private var viewModel = MaterialsViewModel()
     @State private var isHoveringUpload = false
     @State private var showFilePicker = false
+    @State private var projectName: String = ""
+    @State private var showAdvancedSettings = false
     
     var body: some View {
         ScrollView {
@@ -118,7 +120,10 @@ struct MaterialsView: View {
                     
                     // Action button
                     Button(action: {
-                        onComplete(viewModel.materials)
+                        let finalProjectName = projectName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty 
+                            ? (viewModel.materials.isEmpty ? "New Project" : "Project with \(viewModel.materials.count) material\(viewModel.materials.count == 1 ? "" : "s")")
+                            : projectName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onComplete(viewModel.materials, finalProjectName)
                     }) {
                         HStack(spacing: 8) {
                             Text(viewModel.materials.isEmpty ? "Skip and start" : "Start session")
@@ -134,6 +139,46 @@ struct MaterialsView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 32)
+                    
+                    // Advanced Settings button
+                    Button(action: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAdvancedSettings.toggle()
+                        }
+                    }) {
+                        HStack(spacing: 8) {
+                            Text("Advanced Settings")
+                                .font(.caption)
+                            Image(systemName: showAdvancedSettings ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 12))
+                        }
+                        .foregroundColor(.appMutedForeground)
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 16)
+                    
+                    // Advanced Settings panel
+                    if showAdvancedSettings {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Project Name")
+                                .font(.caption.weight(.medium))
+                                .foregroundColor(.appForeground)
+                            
+                            TextField("Enter project name", text: $projectName)
+                                .textFieldStyle(.plain)
+                                .font(.body)
+                                .foregroundColor(.appForeground)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .frame(height: 40)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.appSecondary)
+                                )
+                        }
+                        .padding(.top, 16)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                     
                     // Hint text
                     Text("Materials are optional but help ock give more relevant explanations")
@@ -244,6 +289,6 @@ struct MaterialItemView: View {
 }
 
 #Preview {
-    MaterialsView(onComplete: { _ in }, onBack: {})
+    MaterialsView(onComplete: { _, _ in }, onBack: {})
         .frame(width: 1280, height: 800)
 }

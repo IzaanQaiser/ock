@@ -12,13 +12,15 @@ struct ChatPanel: View {
     @Binding var inputValue: String
     let isListening: Bool
     let isTyping: Bool
-    let isSharing: Bool
     let onToggleListening: () -> Void
     let onSendMessage: () -> Void
     let onReferenceClick: ((String) -> Void)?
     
     @FocusState private var isInputFocused: Bool
     @Binding var shouldFocusInput: Bool
+    @Binding var currentPlayingMessageId: String?
+    let onPlayTTS: (String, String) -> Void
+    let onStopTTS: () -> Void
     @StateObject private var elevenLabsService = ElevenLabsService.shared
     
     init(
@@ -26,21 +28,25 @@ struct ChatPanel: View {
         inputValue: Binding<String>,
         isListening: Bool,
         isTyping: Bool,
-        isSharing: Bool,
         onToggleListening: @escaping () -> Void,
         onSendMessage: @escaping () -> Void,
         onReferenceClick: ((String) -> Void)? = nil,
-        shouldFocusInput: Binding<Bool> = .constant(false)
+        shouldFocusInput: Binding<Bool> = .constant(false),
+        currentPlayingMessageId: Binding<String?> = .constant(nil),
+        onPlayTTS: @escaping (String, String) -> Void = { _, _ in },
+        onStopTTS: @escaping () -> Void = {}
     ) {
         self.messages = messages
         self._inputValue = inputValue
         self.isListening = isListening
         self.isTyping = isTyping
-        self.isSharing = isSharing
         self.onToggleListening = onToggleListening
         self.onSendMessage = onSendMessage
         self.onReferenceClick = onReferenceClick
         self._shouldFocusInput = shouldFocusInput
+        self._currentPlayingMessageId = currentPlayingMessageId
+        self.onPlayTTS = onPlayTTS
+        self.onStopTTS = onStopTTS
     }
     
     var body: some View {
@@ -63,10 +69,10 @@ struct ChatPanel: View {
             // Messages area
             ScrollViewReader { proxy in
                 ScrollView {
-                    VStack(spacing: 16) {
-                        if messages.isEmpty && !isSharing {
+                        VStack(spacing: 16) {
+                        if messages.isEmpty && !isListening {
                             Spacer()
-                            Text("Start sharing your screen to begin your session with ock")
+                            Text("Start a session to begin chatting with ock")
                                 .font(.body)
                                 .foregroundColor(.appMutedForeground)
                                 .multilineTextAlignment(.center)
@@ -121,12 +127,12 @@ struct ChatPanel: View {
                     }
                     .padding(16)
                 }
-                .onChange(of: messages.count) { _ in
+                .onChange(of: messages.count) {
                     withAnimation {
                         proxy.scrollTo("bottom", anchor: .bottom)
                     }
                 }
-                .onChange(of: isTyping) { _ in
+                .onChange(of: isTyping) {
                     if isTyping {
                         withAnimation {
                             proxy.scrollTo("bottom", anchor: .bottom)
@@ -137,20 +143,6 @@ struct ChatPanel: View {
             
             // Input area
             HStack(spacing: 8) {
-                // Push-to-talk button (activates WhisperFlow monitoring)
-                Button(action: onToggleListening) {
-                    Image(systemName: isListening ? "mic.fill" : "mic")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(isListening ? Color.red : Color.appSecondary)
-                        )
-                }
-                .buttonStyle(.plain)
-                .help(isListening ? "Monitoring WhisperFlow... Click to stop" : "Click to start monitoring WhisperFlow (then use WhisperFlow app for push-to-talk)")
-                
                 // Text input
                 TextField(
                     isListening ? "Monitoring WhisperFlow... Use WhisperFlow app to talk" : "Type or speak your question...",
@@ -166,8 +158,8 @@ struct ChatPanel: View {
                         .fill(Color.appSecondary)
                 )
                 .focused($isInputFocused)
-                .onChange(of: shouldFocusInput) { shouldFocus in
-                    if shouldFocus {
+                .onChange(of: shouldFocusInput) { oldValue, newValue in
+                    if newValue {
                         isInputFocused = true
                         // Reset the binding after focusing
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -316,7 +308,6 @@ struct MessageBubble: View {
         inputValue: .constant(""),
         isListening: false,
         isTyping: false,
-        isSharing: true,
         onToggleListening: {},
         onSendMessage: {},
         onReferenceClick: nil,
