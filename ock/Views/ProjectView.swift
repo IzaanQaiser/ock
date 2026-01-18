@@ -18,117 +18,107 @@ struct ProjectView: View {
     @StateObject private var materialsViewModel = MaterialsViewModel()
     
     var body: some View {
-        HStack(spacing: 0) {
-            // Resources panel (left side) - smaller when session is active
-            ResourcesPanel(
-                materials: materials,
-                onAddMaterial: { urls in
-                    materialsViewModel.addMaterials(from: urls)
-                    materials = materialsViewModel.materials
-                    onUpdateMaterials(materials)
-                },
-                onRemoveMaterial: { materialId in
-                    materials.removeAll { $0.id == materialId }
-                    onUpdateMaterials(materials)
-                },
-                isCompact: isSessionActive,
-                isDisabled: false // Enable resource management during session
-            )
-            
-            Divider()
-            
-            VStack(spacing: 0) {
-                // Header - changes based on session state
-                if isSessionActive {
-                    SessionHeaderView(
-                        isSharing: sessionViewModel.isSharing,
-                        hasPermission: sessionViewModel.hasScreenSharePermission,
-                        onToggleShare: {
-                            sessionViewModel.toggleScreenShare()
+        Group {
+            if isSessionActive {
+                // Active session view
+                ActiveSessionView(
+                    materials: $materials,
+                    sessionViewModel: sessionViewModel,
+                    onEndSession: {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            isSessionActive = false
+                        }
+                    }
+                )
+            } else {
+                // Project overview
+                HStack(spacing: 0) {
+                    // Resources panel (left side)
+                    ResourcesPanel(
+                        materials: materials,
+                        onAddMaterial: { urls in
+                            materialsViewModel.addMaterials(from: urls)
+                            materials = materialsViewModel.materials
+                            onUpdateMaterials(materials)
                         },
-                        onEndSession: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isSessionActive = false
-                            }
+                        onRemoveMaterial: { materialId in
+                            materials.removeAll { $0.id == materialId }
+                            onUpdateMaterials(materials)
                         }
                     )
-                } else {
-                    ProjectHeaderView(
-                        projectName: project.name,
-                        onBack: onBack,
-                        canGoBack: true
-                    )
-                }
-                
-                // Main content area - changes based on session state
-                if isSessionActive {
-                    // Active session content
-                    ActiveSessionContent(
-                        materials: $materials,
-                        sessionViewModel: sessionViewModel,
-                        onEndSession: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                isSessionActive = false
-                            }
-                        },
-                        onUpdateMaterials: { updatedMaterials in
-                            materials = updatedMaterials
-                            onUpdateMaterials(updatedMaterials)
-                        }
-                    )
-                } else {
-                    // Project overview content
+                    
+                    Divider()
+                    
                     VStack(spacing: 0) {
-                        Spacer()
+                        // Project header with back button (disabled during session)
+                        ProjectHeaderView(
+                            projectName: project.name,
+                            onBack: {
+                                // Can't go back during active session
+                                if !isSessionActive {
+                                    onBack()
+                                }
+                            },
+                            canGoBack: !isSessionActive
+                        )
                         
-                        VStack(spacing: 32) {
-                            // Project info
-                            VStack(spacing: 12) {
-                                Text(project.name)
-                                    .font(.system(size: 36, weight: .medium))
-                                    .foregroundColor(.appForeground)
+                        // Project content
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                Spacer()
+                                    .frame(height: 100)
                                 
-                                Text("\(materials.count) material\(materials.count == 1 ? "" : "s")")
-                                    .font(.body)
-                                    .foregroundColor(.appMutedForeground)
-                            }
-                            
-                            // Start session button
-                            Button(action: {
-                                withAnimation(.easeInOut(duration: 0.2)) {
-                                    isSessionActive = true
+                                VStack(spacing: 32) {
+                                    // Project info
+                                    VStack(spacing: 12) {
+                                        Text(project.name)
+                                            .font(.system(size: 36, weight: .medium))
+                                            .foregroundColor(.appForeground)
+                                        
+                                        Text("\(materials.count) material\(materials.count == 1 ? "" : "s")")
+                                            .font(.body)
+                                            .foregroundColor(.appMutedForeground)
+                                    }
+                                    
+                                    // Start session button
+                                    Button(action: {
+                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                            isSessionActive = true
+                                        }
+                                    }) {
+                                        HStack(spacing: 12) {
+                                            Image(systemName: "play.fill")
+                                                .font(.system(size: 20))
+                                            Text("Start Session")
+                                                .font(.body.weight(.medium))
+                                        }
+                                        .foregroundColor(.black)
+                                        .padding(.horizontal, 32)
+                                        .frame(height: 56)
+                                        .background(Color.white)
+                                        .cornerRadius(12)
+                                    }
+                                    .buttonStyle(.plain)
+                                    
+                                    // Info text
+                                    Text("Start a session to begin chatting with ock about your materials")
+                                        .font(.caption)
+                                        .foregroundColor(.appMutedForeground)
+                                        .multilineTextAlignment(.center)
+                                        .frame(maxWidth: 400)
                                 }
-                            }) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "play.fill")
-                                        .font(.system(size: 20))
-                                    Text("Start Session")
-                                        .font(.body.weight(.medium))
-                                }
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 32)
-                                .frame(height: 56)
-                                .background(Color.white)
-                                .cornerRadius(12)
+                                .frame(maxWidth: 600)
+                                .padding(.horizontal, 16)
+                                
+                                Spacer()
+                                    .frame(height: 100)
                             }
-                            .buttonStyle(.plain)
-                            
-                            // Info text
-                            Text("Start a session to begin chatting with ock about your materials")
-                                .font(.caption)
-                                .foregroundColor(.appMutedForeground)
-                                .multilineTextAlignment(.center)
-                                .frame(maxWidth: 400)
                         }
-                        .frame(maxWidth: 600)
-                        .padding(.horizontal, 16)
-                        
-                        Spacer()
                     }
                 }
+                .background(Color.appBackground)
             }
         }
-        .background(Color.appBackground)
         .onAppear {
             materialsViewModel.materials = materials
         }

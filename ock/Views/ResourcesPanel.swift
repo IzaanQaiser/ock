@@ -12,25 +12,9 @@ struct ResourcesPanel: View {
     let materials: [UploadedMaterial]
     let onAddMaterial: ([URL]) -> Void
     let onRemoveMaterial: (String) -> Void
-    let isCompact: Bool
-    let isDisabled: Bool
     
     @State private var showFilePicker = false
     @StateObject private var materialsViewModel = MaterialsViewModel()
-    
-    init(
-        materials: [UploadedMaterial],
-        onAddMaterial: @escaping ([URL]) -> Void,
-        onRemoveMaterial: @escaping (String) -> Void,
-        isCompact: Bool = false,
-        isDisabled: Bool = false
-    ) {
-        self.materials = materials
-        self.onAddMaterial = onAddMaterial
-        self.onRemoveMaterial = onRemoveMaterial
-        self.isCompact = isCompact
-        self.isDisabled = isDisabled
-    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -110,7 +94,7 @@ struct ResourcesPanel: View {
                 }
             }
         }
-        .frame(width: isCompact ? 220 : 280)
+        .frame(width: 280)
         .background(Color.appBackground)
         .overlay(
             Rectangle()
@@ -118,8 +102,6 @@ struct ResourcesPanel: View {
                 .foregroundColor(.appBorder),
             alignment: .trailing
         )
-        .opacity(isDisabled ? 0.6 : 1.0)
-        .disabled(isDisabled)
         .fileImporter(
             isPresented: $showFilePicker,
             allowedContentTypes: [.item],
@@ -193,9 +175,7 @@ struct ResourceItemView: View {
             UploadedMaterial(name: "Textbook Chapter 3.docx", type: "docx", size: 1024 * 1024 * 2)
         ],
         onAddMaterial: { _ in },
-        onRemoveMaterial: { _ in },
-        isCompact: false,
-        isDisabled: false
+        onRemoveMaterial: { _ in }
     )
     .frame(width: 280, height: 600)
 }

@@ -18,6 +18,7 @@ struct ChatPanel: View {
     let onReferenceClick: ((String) -> Void)?
     
     @FocusState private var isInputFocused: Bool
+    @Binding var shouldFocusInput: Bool
     
     init(
         messages: [ChatMessage],
@@ -27,7 +28,8 @@ struct ChatPanel: View {
         isSharing: Bool,
         onToggleListening: @escaping () -> Void,
         onSendMessage: @escaping () -> Void,
-        onReferenceClick: ((String) -> Void)? = nil
+        onReferenceClick: ((String) -> Void)? = nil,
+        shouldFocusInput: Binding<Bool> = .constant(false)
     ) {
         self.messages = messages
         self._inputValue = inputValue
@@ -37,6 +39,7 @@ struct ChatPanel: View {
         self.onToggleListening = onToggleListening
         self.onSendMessage = onSendMessage
         self.onReferenceClick = onReferenceClick
+        self._shouldFocusInput = shouldFocusInput
     }
     
     var body: some View {
@@ -113,9 +116,9 @@ struct ChatPanel: View {
             
             // Input area
             HStack(spacing: 8) {
-                // Mic button
+                // Push-to-talk button (activates WhisperFlow monitoring)
                 Button(action: onToggleListening) {
-                    Image(systemName: isListening ? "mic.slash" : "mic")
+                    Image(systemName: isListening ? "mic.fill" : "mic")
                         .font(.system(size: 16))
                         .foregroundColor(.white)
                         .frame(width: 40, height: 40)
@@ -125,10 +128,11 @@ struct ChatPanel: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .help(isListening ? "Monitoring WhisperFlow... Click to stop" : "Click to start monitoring WhisperFlow (then use WhisperFlow app for push-to-talk)")
                 
                 // Text input
                 TextField(
-                    isListening ? "Listening..." : "Type or speak your question...",
+                    isListening ? "Monitoring WhisperFlow... Use WhisperFlow app to talk" : "Type or speak your question...",
                     text: $inputValue
                 )
                 .textFieldStyle(.plain)
@@ -141,6 +145,15 @@ struct ChatPanel: View {
                         .fill(Color.appSecondary)
                 )
                 .focused($isInputFocused)
+                .onChange(of: shouldFocusInput) { shouldFocus in
+                    if shouldFocus {
+                        isInputFocused = true
+                        // Reset the binding after focusing
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            shouldFocusInput = false
+                        }
+                    }
+                }
                 .onSubmit {
                     if !inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         onSendMessage()
@@ -248,7 +261,8 @@ struct MessageBubble: View {
         isSharing: true,
         onToggleListening: {},
         onSendMessage: {},
-        onReferenceClick: nil
+        onReferenceClick: nil,
+        shouldFocusInput: .constant(false)
     )
     .frame(width: 640, height: 600)
 }
