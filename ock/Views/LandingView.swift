@@ -58,7 +58,7 @@ struct LandingView: View {
                         .tracking(-0.5)
                         .padding(.bottom, 24)
                     
-                    // Subheading
+                    // S can you look at the PDF that I just gave you? Explain it to me ubheading
                     Text("Like having a TA beside you 24/7. ock sees your screen, understands your materials, and explains concepts in your own course language.")
                         .font(.body)
                         .foregroundColor(.appMutedForeground)

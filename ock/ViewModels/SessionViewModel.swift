@@ -36,6 +36,7 @@ class SessionViewModel: ObservableObject {
     private let elevenLabsService = ElevenLabsService.shared
     private let geminiService = GeminiService.shared
     private let screenshotCapture = ScreenshotCapture.shared
+    private let materialsContextService = MaterialsContextService.shared
     private var inputValueObserver: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     
@@ -479,7 +480,27 @@ class SessionViewModel: ObservableObject {
             print("🔮 SessionViewModel: Calling Gemini API...")
             let startTime = Date()
             
-            let response = try await geminiService.generateContent(text: text, imageBase64: imageBase64)
+            // Build conversation history from messages (last 10 for speed)
+            let conversationHistory = messages.suffix(10).map { message in
+                ConversationMessage(
+                    role: message.role == .user ? "user" : "assistant",
+                    content: message.content
+                )
+            }
+            print("💬 SessionViewModel: Including \(conversationHistory.count) messages in history")
+            
+            // Get relevant context from materials based on the question
+            let materialsContext = materialsContextService.getRelevantContext(for: text, from: materials)
+            if !materialsContext.isEmpty {
+                print("📚 SessionViewModel: Including \(materialsContext.count) chars of materials context")
+            }
+            
+            let response = try await geminiService.generateContent(
+                text: text,
+                imageBase64: imageBase64,
+                conversationHistory: Array(conversationHistory),
+                materialsContext: materialsContext.isEmpty ? nil : materialsContext
+            )
             
             let apiTime = Date().timeIntervalSince(startTime)
             print("⏱️ SessionViewModel: Gemini API call took \(String(format: "%.2f", apiTime)) seconds")

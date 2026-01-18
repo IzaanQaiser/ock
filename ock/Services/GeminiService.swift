@@ -111,8 +111,16 @@ class GeminiService: ObservableObject {
     ///   - text: The user's question/prompt
     ///   - imageBase64: Optional base64-encoded image (JPEG/PNG)
     ///   - mimeType: MIME type of the image (default: "image/jpeg")
+    ///   - conversationHistory: Optional array of previous messages for context
+    ///   - materialsContext: Optional relevant text from course materials
     /// - Returns: Generated text response
-    func generateContent(text: String, imageBase64: String? = nil, mimeType: String = "image/jpeg") async throws -> String {
+    func generateContent(
+        text: String,
+        imageBase64: String? = nil,
+        mimeType: String = "image/jpeg",
+        conversationHistory: [ConversationMessage] = [],
+        materialsContext: String? = nil
+    ) async throws -> String {
         let currentApiKey = apiKey
         print("🔑 GeminiService: Using API key: \(String(currentApiKey.prefix(20)))...")
         guard !currentApiKey.isEmpty else {
@@ -139,7 +147,15 @@ class GeminiService: ObservableObject {
             }
             
             do {
-                return try await makeRequest(url: url, text: text, imageBase64: imageBase64, mimeType: mimeType, modelName: modelName)
+                return try await makeRequest(
+                    url: url,
+                    text: text,
+                    imageBase64: imageBase64,
+                    mimeType: mimeType,
+                    modelName: modelName,
+                    conversationHistory: conversationHistory,
+                    materialsContext: materialsContext
+                )
             } catch {
                 lastError = error
                 // If it's a 404 (model not found), try next model
@@ -158,36 +174,89 @@ class GeminiService: ObservableObject {
         throw lastError ?? GeminiError.apiError(statusCode: 404, message: "No available models found")
     }
     
-    private func makeRequest(url: URL, text: String, imageBase64: String?, mimeType: String, modelName: String) async throws -> String {
+    private func makeRequest(
+        url: URL,
+        text: String,
+        imageBase64: String?,
+        mimeType: String,
+        modelName: String,
+        conversationHistory: [ConversationMessage],
+        materialsContext: String?
+    ) async throws -> String {
         
-        // Build request body according to Gemini API spec
-        // System prompt for adaptive TA behavior
-        let systemPrompt = """
-You are a chill teaching assistant. Look at their screen and respond naturally.
+        // Build system instruction with course materials context
+        var systemInstruction = """
+You are a chill teaching assistant who helps students LEARN, not just get answers.
 
-RESPONSE LENGTH - Match the question's depth:
-- Simple question ("what's this?") → 1 sentence, ~15 words
-- Moderate question ("explain this part") → 2-3 sentences, ~40 words  
-- Deep question ("help me understand how X works") → 3-4 sentences, ~60 words max
+TEACHING PHILOSOPHY (CRITICAL):
+- NEVER give the direct answer or solution right away
+- Use the Socratic method: ask guiding questions that lead them to discover the answer
+- Give hints and nudges, not solutions
+- Help them understand the WHY, not just the WHAT
+- If they're stuck on a problem, ask "What have you tried?" or "What part is confusing you?"
+- When they're on the right track, encourage them: "Yeah, you're thinking about it right"
+- Only give more direct help if they're really struggling after a few exchanges
 
-STYLE:
-- Always concise - no fluff, no filler words
-- Casual tone, like a knowledgeable friend
-- Hit all the key points efficiently
-- No bullet points or formal structure
-- Speak naturally, ready for text-to-speech
+RESPONSE STYLE:
+- Keep it SHORT - 1-2 sentences max, like a real conversation
+- Casual tone, like a friend who's good at this subject
+- Ask ONE guiding question at a time, don't overwhelm
+- Speak naturally, ready for text-to-speech (no bullet points, no markdown)
+- Remember what they've told you in this conversation
 
-User says: \(text)
+EXAMPLES OF GOOD RESPONSES:
+- "Hmm, what do you think happens to x when you plug in that value?"
+- "You're close! What's the relationship between these two terms?"
+- "Before solving, what's this equation actually asking you to find?"
+- "Nice, you got the setup right. Now what's the next step you'd try?"
+
+EXAMPLES OF BAD RESPONSES (DON'T DO THIS):
+- "The answer is 42" (too direct)
+- "First do X, then Y, then Z" (solving it for them)
+- "Here's how to solve it: ..." (giving away the solution)
 """
-        let promptText = systemPrompt
         
-        var parts: [[String: Any]] = [
-            ["text": promptText]
+        // Add course materials context if available
+        if let materials = materialsContext, !materials.isEmpty {
+            systemInstruction += """
+
+
+COURSE MATERIALS CONTEXT:
+Use this information from the student's course materials to answer their questions. Reference specific parts when relevant.
+
+\(materials)
+
+---
+When answering, prioritize information from these course materials. If the answer isn't in the materials, you can use general knowledge but mention that.
+"""
+            print("📚 GeminiService: Including \(materials.count) chars of materials context")
+        }
+        
+        // Build conversation history for multi-turn
+        var contents: [[String: Any]] = []
+        
+        // Add previous messages (limit to last 10 for speed)
+        let recentHistory = conversationHistory.suffix(10)
+        if !recentHistory.isEmpty {
+            print("💬 GeminiService: Including \(recentHistory.count) messages of conversation history")
+        }
+        
+        for message in recentHistory {
+            let role = message.role == "user" ? "user" : "model"
+            contents.append([
+                "role": role,
+                "parts": [["text": message.content]]
+            ])
+        }
+        
+        // Add current message with optional image
+        var currentParts: [[String: Any]] = [
+            ["text": text]
         ]
         
-        // Add image part if provided (using inlineData, not inline_data)
+        // Add image part if provided
         if let imageBase64 = imageBase64 {
-            parts.append([
+            currentParts.append([
                 "inlineData": [
                     "mimeType": mimeType,
                     "data": imageBase64
@@ -195,12 +264,15 @@ User says: \(text)
             ])
         }
         
+        contents.append([
+            "role": "user",
+            "parts": currentParts
+        ])
+        
         let requestBody: [String: Any] = [
-            "contents": [
-                [
-                    "role": "user",
-                    "parts": parts
-                ]
+            "contents": contents,
+            "systemInstruction": [
+                "parts": [["text": systemInstruction]]
             ],
             "generationConfig": [
                 "temperature": 0.7
@@ -343,4 +415,10 @@ enum GeminiError: LocalizedError {
             return "Gemini API Error \(statusCode): \(message)"
         }
     }
+}
+
+/// Simple struct for conversation history
+struct ConversationMessage {
+    let role: String  // "user" or "assistant"
+    let content: String
 }
