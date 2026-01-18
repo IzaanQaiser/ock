@@ -47,18 +47,35 @@ class MaterialsViewModel: ObservableObject {
         isExtracting = true
         
         // Process on background thread to keep UI responsive
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        Task {
             for url in urls {
                 // Extract on background
                 let resourceValues = try? url.resourceValues(forKeys: [.fileSizeKey, .typeIdentifierKey])
                 let size = Int64(resourceValues?.fileSize ?? 0)
                 let type = resourceValues?.typeIdentifier ?? ""
                 
-                print("📄 MaterialsViewModel: Processing \(url.lastPathComponent)...")
-                let extractedText = self?.textExtractor.extractText(fromDocument: url)
+                debugLog("📄 MaterialsViewModel: Processing \(url.lastPathComponent)...")
+                let extractedText = textExtractor.extractText(fromDocument: url)
                 
-                if let text = extractedText {
-                    print("✅ MaterialsViewModel: Extracted \(text.count) chars from \(url.lastPathComponent)")
+                var originalTokens: Int? = nil
+                var compressedTokens: Int? = nil
+                
+                if let text = extractedText, !text.isEmpty {
+                    debugLog("✅ MaterialsViewModel: Extracted \(text.count) chars from \(url.lastPathComponent)")
+                    
+                    // Compress to get token stats (for display purposes)
+                    do {
+                        debugLog("🗜️ MaterialsViewModel: Getting compression stats for \(url.lastPathComponent)...")
+                        let result = try await TokenCompanyService.shared.compressCourseContext(text)
+                        originalTokens = result.originalInputTokens
+                        compressedTokens = result.outputTokens
+                        if let orig = originalTokens, let comp = compressedTokens {
+                            let savings = orig > 0 ? Double(orig - comp) / Double(orig) * 100 : 0
+                            debugLog("📊 MaterialsViewModel: \(url.lastPathComponent) - \(orig) → \(comp) tokens (\(String(format: "%.0f", savings))% savings)")
+                        }
+                    } catch {
+                        debugLog("⚠️ MaterialsViewModel: Could not get compression stats: \(error.localizedDescription)")
+                    }
                 }
                 
                 let material = UploadedMaterial(
@@ -66,17 +83,19 @@ class MaterialsViewModel: ObservableObject {
                     type: type,
                     size: size,
                     fileURL: url,
-                    extractedText: extractedText
+                    extractedText: extractedText,
+                    originalTokenCount: originalTokens,
+                    compressedTokenCount: compressedTokens
                 )
                 
                 // Update UI on main thread
-                DispatchQueue.main.async {
-                    self?.materials.append(material)
+                await MainActor.run {
+                    self.materials.append(material)
                 }
             }
             
-            DispatchQueue.main.async {
-                self?.isExtracting = false
+            await MainActor.run {
+                self.isExtracting = false
                 completion?()
             }
         }

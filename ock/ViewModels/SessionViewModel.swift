@@ -471,14 +471,24 @@ class SessionViewModel: ObservableObject {
             print("🔮 SessionViewModel: Calling Gemini API...")
             let startTime = Date()
             
+            // Track compression stats
+            var transcriptOriginal = 0
+            var transcriptCompressed = 0
+            var contextOriginal = 0
+            var contextCompressed = 0
+            
             // Compress user's transcription/question
             var compressedQuestion = text
             if text.count > 50 { // Only compress if long enough
                 do {
                     debugLog("🎤 SessionViewModel: Compressing user transcription...")
                     debugLog("   - Original: \(text.count) chars")
-                    compressedQuestion = try await TokenCompanyService.shared.compressTranscription(text)
+                    let result = try await TokenCompanyService.shared.compressTranscription(text)
+                    compressedQuestion = result.output
+                    transcriptOriginal = result.originalInputTokens ?? 0
+                    transcriptCompressed = result.outputTokens ?? 0
                     debugLog("   - Compressed: \(compressedQuestion.count) chars")
+                    debugLog("   - Tokens: \(transcriptOriginal) → \(transcriptCompressed)")
                 } catch {
                     debugLog("⚠️ SessionViewModel: Transcription compression failed, using original")
                     compressedQuestion = text
@@ -498,6 +508,8 @@ class SessionViewModel: ObservableObject {
             let courseContext = materialsContextService.getRelevantContext(for: compressedQuestion, from: materials)
             debugLog("📚 SessionViewModel: Context retrieval result: \(courseContext.count) chars")
             
+            // Compress course context and track stats
+            var compressedContext: String? = nil
             if !courseContext.isEmpty {
                 debugLog("📚 ---- RAW CONTEXT START ----")
                 debugLog(String(courseContext.prefix(1000))) // First 1000 chars to avoid flooding
@@ -505,14 +517,50 @@ class SessionViewModel: ObservableObject {
                     debugLog("... [\(courseContext.count - 1000) more chars]")
                 }
                 debugLog("📚 ---- RAW CONTEXT END ----")
+                
+                // Compress context here instead of in GeminiService so we can track stats
+                do {
+                    debugLog("🗜️ SessionViewModel: Compressing course context...")
+                    let result = try await TokenCompanyService.shared.compressCourseContext(courseContext)
+                    compressedContext = result.output
+                    contextOriginal = result.originalInputTokens ?? 0
+                    contextCompressed = result.outputTokens ?? 0
+                    debugLog("   - Tokens: \(contextOriginal) → \(contextCompressed)")
+                } catch {
+                    debugLog("⚠️ SessionViewModel: Context compression failed, using original")
+                    compressedContext = courseContext
+                }
             } else {
                 debugLog("⚠️ SessionViewModel: No relevant context found from materials!")
             }
             
+            // Create compression stats
+            let compressionStats = MessageCompressionStats(
+                transcriptionOriginalTokens: transcriptOriginal,
+                transcriptionCompressedTokens: transcriptCompressed,
+                contextOriginalTokens: contextOriginal,
+                contextCompressedTokens: contextCompressed
+            )
+            
+            // Update the last user message with compression stats
+            if let lastIndex = messages.lastIndex(where: { $0.role == .user }) {
+                let oldMessage = messages[lastIndex]
+                messages[lastIndex] = ChatMessage(
+                    id: oldMessage.id,
+                    role: oldMessage.role,
+                    content: oldMessage.content,
+                    timestamp: oldMessage.timestamp,
+                    references: oldMessage.references,
+                    compressionStats: compressionStats
+                )
+            }
+            
+            debugLog("📊 Compression stats: \(compressionStats.tokensSaved) tokens saved (\(String(format: "%.1f", compressionStats.totalSavingsPercent))%)")
+            
             let response = try await geminiService.generateContent(
                 text: compressedQuestion,
                 imageBase64: imageBase64,
-                courseContext: courseContext.isEmpty ? nil : courseContext
+                courseContext: compressedContext // Already compressed
             )
             
             let apiTime = Date().timeIntervalSince(startTime)

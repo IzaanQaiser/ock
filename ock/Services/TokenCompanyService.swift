@@ -159,16 +159,14 @@ class TokenCompanyService: ObservableObject {
     
     /// Compress course material context (uses light aggressiveness to preserve meaning)
     /// Best for PDF chunks and lecture notes
-    func compressCourseContext(_ text: String) async throws -> String {
-        let result = try await compress(text: text, aggressiveness: 0.1)
-        return result.output
+    func compressCourseContext(_ text: String) async throws -> CompressionResult {
+        return try await compress(text: text, aggressiveness: 0.1)
     }
     
     /// Compress voice transcription (uses minimal aggressiveness)
     /// Best for WhisperFlow transcriptions
-    func compressTranscription(_ text: String) async throws -> String {
-        let result = try await compress(text: text, aggressiveness: 0.1)
-        return result.output
+    func compressTranscription(_ text: String) async throws -> CompressionResult {
+        return try await compress(text: text, aggressiveness: 0.1)
     }
 }
 

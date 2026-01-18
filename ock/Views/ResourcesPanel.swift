@@ -125,40 +125,64 @@ struct ResourceItemView: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "doc.text")
-                .font(.system(size: 16))
-                .foregroundColor(.appMutedForeground)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(material.name)
-                    .font(.body)
-                    .foregroundColor(.appForeground)
-                    .lineLimit(2)
+            // Document icon with compression indicator
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: "doc.text.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(.appMutedForeground.opacity(0.6))
                 
-                Text(FileSizeFormatter.format(material.size))
-                    .font(.caption2)
-                    .foregroundColor(.appMutedForeground)
+                // Small compression indicator
+                if material.savingsPercent > 0 {
+                    Circle()
+                        .fill(Color.green)
+                        .frame(width: 8, height: 8)
+                        .offset(x: 2, y: 2)
+                }
+            }
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(material.name)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundColor(.appForeground)
+                    .lineLimit(1)
+                
+                HStack(spacing: 6) {
+                    Text(FileSizeFormatter.format(material.size))
+                        .font(.caption)
+                        .foregroundColor(.appMutedForeground)
+                    
+                    if material.savingsPercent > 0 {
+                        Text("•")
+                            .font(.caption)
+                            .foregroundColor(.appMutedForeground.opacity(0.5))
+                        
+                        Text("-\(String(format: "%.0f", material.savingsPercent))% tokens")
+                            .font(.caption)
+                            .foregroundColor(.green.opacity(0.9))
+                    }
+                }
             }
             
             Spacer()
             
             Button(action: onRemove) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 12))
+                    .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.appMutedForeground)
-                    .padding(4)
+                    .padding(6)
                     .background(
                         Circle()
-                            .fill(isHovering ? Color.appMuted : Color.clear)
+                            .fill(Color.appMuted.opacity(isHovering ? 0.8 : 0))
                     )
             }
             .buttonStyle(.plain)
             .opacity(isHovering ? 1 : 0)
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.appSecondary)
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.appSecondary.opacity(0.7))
         )
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {

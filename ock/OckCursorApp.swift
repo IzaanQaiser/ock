@@ -16,7 +16,7 @@ struct OckCursorApp: App {
         
         // Set API keys FIRST (before any service initialization)
         debugLog("🔑 Setting API keys...")
-        GeminiService.shared.setAPIKey("AIzaSyC-EMUTlmBnIumeWOHjS53kIXnljC5crqM")
+        GeminiService.shared.setAPIKey("AIzaSyDcvwCHlEqCHvOy6CRh1gjuYRUAeSbcNMc")
         ElevenLabsService.shared.setAPIKey("sk_be3b4af3b2d114d29489f3132ab416845eadfef34967a534")
         TokenCompanyService.shared.setAPIKey("ttc_sk_ZIdKjXkRqfFnoSFlIZC-Gu971sBE8NWzhVGJ0idkOxM")
         

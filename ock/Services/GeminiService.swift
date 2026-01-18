@@ -180,27 +180,8 @@ class GeminiService: ObservableObject {
     
     private func makeRequest(url: URL, text: String, imageBase64: String?, mimeType: String, modelName: String, courseContext: String? = nil) async throws -> String {
         
-        // Compress course context using Token Company if provided
-        var compressedContext: String? = nil
-        if let context = courseContext, !context.isEmpty {
-            do {
-                debugLog("🗜️ GeminiService: Compressing course context with Token Company...")
-                compressedContext = try await TokenCompanyService.shared.compressCourseContext(context)
-                debugLog("   - Original: \(context.count) chars → Compressed: \(compressedContext?.count ?? 0) chars")
-                debugLog("🗜️ ---- COMPRESSED CONTEXT START ----")
-                debugLog(String(compressedContext?.prefix(800) ?? "nil"))
-                if (compressedContext?.count ?? 0) > 800 {
-                    debugLog("... [\((compressedContext?.count ?? 0) - 800) more chars]")
-                }
-                debugLog("🗜️ ---- COMPRESSED CONTEXT END ----")
-            } catch {
-                debugLog("⚠️ GeminiService: Token Company compression failed, using original context")
-                debugLog("   - Error: \(error.localizedDescription)")
-                compressedContext = context // Fallback to uncompressed
-            }
-        } else {
-            debugLog("⚠️ GeminiService: No course context provided to compress")
-        }
+        // Use the already-compressed context (compression now happens in SessionViewModel for stats tracking)
+        let compressedContext = courseContext
         
         // Build request body according to Gemini API spec
         // System prompt for casual TA behavior - keep responses SHORT
