@@ -13,20 +13,14 @@ struct ProjectsHubView: View {
     let onSelectProject: (Project) -> Void
     
     var body: some View {
-        ZStack {
-            // Subtle background glow
-            Circle()
-                .fill(Color.white.opacity(0.02))
-                .frame(width: 600, height: 600)
-                .blur(radius: 100)
-                .offset(x: 0, y: 0)
-            
+        ScrollView {
             VStack(spacing: 0) {
                 Spacer()
+                    .frame(height: 100)
                 
-                VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 0) {
                     // Header
-                    VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text("Projects")
                             .font(.system(size: 30, weight: .medium))
                             .foregroundColor(.appForeground)
@@ -34,12 +28,9 @@ struct ProjectsHubView: View {
                         Text("Create a new project or continue working on an existing one.")
                             .font(.body)
                             .foregroundColor(.appMutedForeground)
-                            .multilineTextAlignment(.center)
-                            .lineSpacing(4)
-                            .frame(maxWidth: 512)
                     }
-                    .padding(.bottom, 48)
-                
+                    .padding(.bottom, 32)
+                    
                     if projects.isEmpty {
                         // Empty state - show create button prominently
                         VStack(spacing: 24) {
@@ -65,15 +56,17 @@ struct ProjectsHubView: View {
                                         .font(.body.weight(.medium))
                                 }
                                 .foregroundColor(.black)
-                                .padding(.horizontal, 32)
-                                .frame(height: 56)
+                                .padding(.horizontal, 24)
+                                .frame(height: 48)
                                 .background(Color.white)
                                 .cornerRadius(12)
                             }
                             .buttonStyle(.plain)
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 80)
                     } else {
-                        // Projects grid - wider container for grid layout
+                        // Projects grid
                         LazyVGrid(columns: [
                             GridItem(.adaptive(minimum: 280, maximum: 320), spacing: 16)
                         ], spacing: 16) {
@@ -87,13 +80,13 @@ struct ProjectsHubView: View {
                                 }
                             }
                         }
-                        .frame(maxWidth: 1200)
                     }
                 }
-                .frame(maxWidth: 672)
+                .frame(maxWidth: 1200)
                 .padding(.horizontal, 16)
                 
                 Spacer()
+                    .frame(height: 100)
             }
         }
     }
@@ -165,6 +158,10 @@ struct ProjectCard: View {
                 }
                 
                 Spacer()
+                
+                Text(project.updatedAt, style: .relative)
+                    .font(.caption2)
+                    .foregroundColor(.appMutedForeground)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(16)
