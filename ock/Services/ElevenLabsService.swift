@@ -14,14 +14,14 @@ class ElevenLabsService: NSObject, ObservableObject {
     static let shared = ElevenLabsService()
     
     // API Configuration
-    private var apiKey: String {
-        get {
-            UserDefaults.standard.string(forKey: "elevenlabs_api_key") ?? "sk_be3b4af3b2d114d29489f3132ab416845eadfef34967a534"
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: "elevenlabs_api_key")
-        }
-    }
+            private var apiKey: String {
+                get {
+                    UserDefaults.standard.string(forKey: "elevenlabs_api_key") ?? "YOUR_ELEVENLABS_API_KEY_HERE"
+                }
+                set {
+                    UserDefaults.standard.set(newValue, forKey: "elevenlabs_api_key")
+                }
+            }
     private let baseURL = "https://api.elevenlabs.io/v1"
     private let defaultVoiceId = "21m00Tcm4TlvDq8ikWAM" // Default voice (Rachel)
     private let defaultModelId = "eleven_multilingual_v2" // Eleven Multilingual v2
@@ -33,9 +33,10 @@ class ElevenLabsService: NSObject, ObservableObject {
     
     private override init() {
         super.init()
-        // Initialize with default API key if not set
+        // Initialize with placeholder API key if not set (user should set their own key)
         if UserDefaults.standard.string(forKey: "elevenlabs_api_key") == nil {
-            UserDefaults.standard.set("sk_be3b4af3b2d114d29489f3132ab416845eadfef34967a534", forKey: "elevenlabs_api_key")
+            UserDefaults.standard.set("YOUR_ELEVENLABS_API_KEY_HERE", forKey: "elevenlabs_api_key")
+            print("⚠️ ElevenLabsService: Using placeholder API key. Please set your ElevenLabs API key.")
         }
     }
     
@@ -44,32 +45,38 @@ class ElevenLabsService: NSObject, ObservableObject {
         UserDefaults.standard.set(key, forKey: "elevenlabs_api_key")
     }
     
-    /// Convert text to speech and play it
-    /// - Parameters:
-    ///   - text: The text to convert to speech
-    ///   - messageId: Optional message ID to track which message is playing
-    ///   - voiceId: Optional voice ID (defaults to Rachel)
-    ///   - modelId: Optional model ID (defaults to eleven_multilingual_v2)
-    func speak(text: String, messageId: String? = nil, voiceId: String? = nil, modelId: String? = nil) async throws {
-        let currentApiKey = apiKey
-        guard !currentApiKey.isEmpty else {
-            throw ElevenLabsError.apiKeyNotSet
-        }
-        
-        // Stop any currently playing audio
-        stop()
-        
-        // Generate audio from text
-        let audioData = try await generateSpeech(
-            text: text,
-            voiceId: voiceId ?? defaultVoiceId,
-            modelId: modelId ?? defaultModelId,
-            apiKey: currentApiKey
-        )
-        
-        // Play the audio
-        try await playAudio(data: audioData, messageId: messageId)
-    }
+            /// Convert text to speech and play it
+            /// - Parameters:
+            ///   - text: The text to convert to speech
+            ///   - messageId: Optional message ID to track which message is playing
+            ///   - voiceId: Optional voice ID (defaults to Rachel)
+            ///   - modelId: Optional model ID (defaults to eleven_multilingual_v2)
+            func speak(text: String, messageId: String? = nil, voiceId: String? = nil, modelId: String? = nil) async throws {
+                let currentApiKey = apiKey
+                guard !currentApiKey.isEmpty else {
+                    throw ElevenLabsError.apiKeyNotSet
+                }
+
+                // Stop any currently playing audio
+                stop()
+
+                print("🔊 ElevenLabsService: Starting TTS generation")
+                let generationStartTime = Date()
+                
+                // Generate audio from text (this is the slow part - API call)
+                let audioData = try await generateSpeech(
+                    text: text,
+                    voiceId: voiceId ?? defaultVoiceId,
+                    modelId: modelId ?? defaultModelId,
+                    apiKey: currentApiKey
+                )
+                
+                let generationTime = Date().timeIntervalSince(generationStartTime)
+                print("⏱️ ElevenLabsService: TTS generation took \(String(format: "%.2f", generationTime)) seconds")
+
+                // Play the audio (this is fast - just playback)
+                try await playAudio(data: audioData, messageId: messageId)
+            }
     
     /// Generate speech from text using ElevenLabs API
     private func generateSpeech(text: String, voiceId: String, modelId: String, apiKey: String) async throws -> Data {

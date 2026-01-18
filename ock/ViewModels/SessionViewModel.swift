@@ -511,7 +511,12 @@ class SessionViewModel: ObservableObject {
     private func callGemini(text: String, imageBase64: String?, materials: [UploadedMaterial]) async {
         do {
             print("🔮 SessionViewModel: Calling Gemini API...")
+            let startTime = Date()
+            
             let response = try await geminiService.generateContent(text: text, imageBase64: imageBase64)
+            
+            let apiTime = Date().timeIntervalSince(startTime)
+            print("⏱️ SessionViewModel: Gemini API call took \(String(format: "%.2f", apiTime)) seconds")
             
             await MainActor.run {
                 print("✅ SessionViewModel: Received response from Gemini")
@@ -523,10 +528,36 @@ class SessionViewModel: ObservableObject {
                 }.map { $0.name }
                 
                 // Add assistant message with response
-                self.addAssistantMessage(
+                let assistantMessage = ChatMessage(
+                    role: .assistant,
                     content: response,
                     references: refs.isEmpty ? nil : refs
                 )
+                
+                messages.append(assistantMessage)
+                
+                // If references are provided, add them
+                if !refs.isEmpty {
+                    addReferences(refs)
+                }
+                
+                // Start TTS immediately (don't wait)
+                Task { [weak self] in
+                    guard let self = self else { return }
+                    let ttsStartTime = Date()
+                    do {
+                        print("🔊 SessionViewModel: Starting TTS immediately after response")
+                        try await self.elevenLabsService.speak(text: response, messageId: assistantMessage.id)
+                        let ttsTime = Date().timeIntervalSince(ttsStartTime)
+                        print("⏱️ SessionViewModel: TTS generation took \(String(format: "%.2f", ttsTime)) seconds")
+                        await MainActor.run {
+                            self.currentPlayingMessageId = assistantMessage.id
+                        }
+                    } catch {
+                        print("⚠️ SessionViewModel: Failed to play TTS")
+                        print("   - Error: \(error.localizedDescription)")
+                    }
+                }
                 
                 self.isTyping = false
             }
@@ -535,13 +566,22 @@ class SessionViewModel: ObservableObject {
                 print("❌ SessionViewModel: Gemini API call failed")
                 print("   - Error: \(error.localizedDescription)")
                 
-                // Fallback to error message
+                // Parse error for better user message
+                var userMessage = "Sorry, I encountered an error: \(error.localizedDescription)"
+                
+                if let geminiError = error as? GeminiError,
+                   case .apiError(_, let message) = geminiError {
+                    // Use the detailed error message from GeminiService (already formatted)
+                    userMessage = message
+                }
+                
+                // Add assistant message with error
                 self.addAssistantMessage(
-                    content: "Sorry, I encountered an error: \(error.localizedDescription). Please check your Gemini API key in settings.",
+                    content: userMessage,
                     references: nil
                 )
                 
-            self.isTyping = false
+                self.isTyping = false
             }
         }
     }

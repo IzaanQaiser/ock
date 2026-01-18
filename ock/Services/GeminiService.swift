@@ -11,14 +11,14 @@ import Combine
 class GeminiService: ObservableObject {
     static let shared = GeminiService()
     
-    private var apiKey: String {
-        get {
-            UserDefaults.standard.string(forKey: "gemini_api_key") ?? "AIzaSyCPY7RGCCIcIk2kOAZKJPvLtmC7TpgWpuU"
-        }
-        set {
-            UserDefaults.standard.set(newValue, forKey: "gemini_api_key")
-        }
-    }
+            private var apiKey: String {
+                get {
+                    UserDefaults.standard.string(forKey: "gemini_api_key") ?? "YOUR_GEMINI_API_KEY_HERE"
+                }
+                set {
+                    UserDefaults.standard.set(newValue, forKey: "gemini_api_key")
+                }
+            }
     
     // Model names to try in order (will be populated from API)
     private var availableModels: [String] = []
@@ -86,10 +86,10 @@ class GeminiService: ObservableObject {
     }
     
     private init() {
-        // Initialize with default API key if not set
+        // Initialize API key if not set (user should set their own key)
         if UserDefaults.standard.string(forKey: "gemini_api_key") == nil {
-            UserDefaults.standard.set("AIzaSyCPY7RGCCIcIk2kOAZKJPvLtmC7TpgWpuU", forKey: "gemini_api_key")
-            print("✅ GeminiService: Default API key initialized")
+            UserDefaults.standard.set("YOUR_GEMINI_API_KEY_HERE", forKey: "gemini_api_key")
+            print("⚠️ GeminiService: Using placeholder API key. Please set your Gemini API key.")
         }
     }
     
@@ -97,6 +97,13 @@ class GeminiService: ObservableObject {
     func setAPIKey(_ key: String) {
         UserDefaults.standard.set(key, forKey: "gemini_api_key")
         print("🔑 GeminiService: API Key set.")
+    }
+    
+    /// Get the current API key (for debugging)
+    func getCurrentAPIKey() -> String {
+        let currentKey = apiKey
+        print("🔑 GeminiService: Current API key: \(String(currentKey.prefix(20)))...")
+        return currentKey
     }
     
     /// Generate content using Gemini API with text and optional image
@@ -107,6 +114,7 @@ class GeminiService: ObservableObject {
     /// - Returns: Generated text response
     func generateContent(text: String, imageBase64: String? = nil, mimeType: String = "image/jpeg") async throws -> String {
         let currentApiKey = apiKey
+        print("🔑 GeminiService: Using API key: \(String(currentApiKey.prefix(20)))...")
         guard !currentApiKey.isEmpty else {
             throw GeminiError.apiKeyNotSet
         }
@@ -211,7 +219,66 @@ class GeminiService: ObservableObject {
             print("   - Model: \(modelName)")
             print("   - Status code: \(httpResponse.statusCode)")
             print("   - Response: \(responseBody)")
-            throw GeminiError.apiError(statusCode: httpResponse.statusCode, message: responseBody)
+            
+            // Try to parse error details from response
+            var errorMessage = responseBody
+            var retryAfter: TimeInterval? = nil
+            var quotaLimit: String? = nil
+            
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let error = json["error"] as? [String: Any] {
+                if let message = error["message"] as? String {
+                    errorMessage = message
+                    print("   - Parsed error message: \(message)")
+                    
+                    // Extract retry-after time from message (e.g., "Please retry in 48.42572463s")
+                    if let retryRange = message.range(of: "Please retry in "),
+                       let secondsRange = message.range(of: "s", range: retryRange.upperBound..<message.endIndex) {
+                        let secondsString = String(message[retryRange.upperBound..<secondsRange.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        if let seconds = Double(secondsString) {
+                            retryAfter = seconds
+                            print("   - Retry after: \(seconds) seconds")
+                        }
+                    }
+                    
+                    // Extract quota limit from message
+                    if let limitRange = message.range(of: "limit: `"),
+                       let limitEndRange = message.range(of: "`", range: limitRange.upperBound..<message.endIndex) {
+                        quotaLimit = String(message[limitRange.upperBound..<limitEndRange.lowerBound])
+                        print("   - Quota limit: \(quotaLimit ?? "unknown")")
+                    }
+                }
+                if let status = error["status"] as? String {
+                    print("   - Error status: \(status)")
+                }
+                if let details = error["details"] as? [[String: Any]] {
+                    print("   - Error details: \(details)")
+                }
+            }
+            
+            // Check for specific error types
+            if httpResponse.statusCode == 429 {
+                if errorMessage.contains("free_tier") || errorMessage.contains("FreeTier") {
+                    let limitText = quotaLimit.map { " (limit: \($0) requests/day)" } ?? ""
+                    errorMessage = "Free tier quota exceeded\(limitText). The free tier allows 20 requests per day per model. You can:\n• Wait until tomorrow for the quota to reset\n• Upgrade to a paid plan in Google Cloud Console\n• Use a different API key"
+                    if let retrySeconds = retryAfter {
+                        errorMessage += "\n\nRetry after: \(Int(retrySeconds)) seconds"
+                    }
+                } else {
+                    errorMessage = "Rate limit exceeded. You may be hitting IP-based rate limits. Try again in a few moments or check your API quota."
+                    if let retrySeconds = retryAfter {
+                        errorMessage += "\n\nRetry after: \(Int(retrySeconds)) seconds"
+                    }
+                }
+            } else if httpResponse.statusCode == 403 {
+                if errorMessage.lowercased().contains("quota") || errorMessage.lowercased().contains("exceeded") {
+                    errorMessage = "API quota exceeded. This could be due to:\n- Free tier daily limits\n- IP-based rate limiting\n- Account-level quota limits\n\nCheck your Google Cloud Console for quota details."
+                } else {
+                    errorMessage = "Permission denied (403). Please check:\n• Your API key is valid\n• The API is enabled in Google Cloud Console\n• Your account has proper permissions"
+                }
+            }
+            
+            throw GeminiError.apiError(statusCode: httpResponse.statusCode, message: errorMessage)
         }
         
         // Parse response
