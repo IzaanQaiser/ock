@@ -12,22 +12,31 @@ struct ActiveSessionView: View {
     @ObservedObject var sessionViewModel: SessionViewModel
     let onEndSession: () -> Void // This is now only used for going back to project view, not for stopping mic
     let onBack: () -> Void // Back to projects
+    let onUpdateMaterials: ([UploadedMaterial]) -> Void // For updating materials during active session
     
     var body: some View {
         HStack(spacing: 0) {
-            // Resources panel (left side)
+            // Resources panel (left side) - enabled during active session
             ResourcesPanel(
                 materials: materials,
                 onAddMaterial: { urls in
-                    // Materials can be added but won't affect active session immediately
-                    // They'll be available after session ends
+                    // Add materials during active session
+                    let materialsViewModel = MaterialsViewModel()
+                    materialsViewModel.materials = materials
+                    
+                    // Process materials asynchronously and update when done
+                    materialsViewModel.addMaterials(from: urls) {
+                        // Completion handler - update materials after processing is complete
+                        onUpdateMaterials(materialsViewModel.materials)
+                    }
                 },
-                onRemoveMaterial: { _ in
-                    // Can't remove materials during active session
+                onRemoveMaterial: { materialId in
+                    // Remove materials during active session
+                    var updatedMaterials = materials
+                    updatedMaterials.removeAll { $0.id == materialId }
+                    onUpdateMaterials(updatedMaterials)
                 }
             )
-            .disabled(true)
-            .opacity(0.6)
             
             Divider()
             
@@ -46,132 +55,136 @@ struct ActiveSessionView: View {
                     onBack: onBack
                 )
                 
-                // Main content - dynamic layout
-                if let previewedFileName = sessionViewModel.previewedFileName,
-                   materials.first(where: { $0.name == previewedFileName }) != nil {
-                    // Split view: 60% PDF preview, 40% Chat
-                    GeometryReader { geometry in
-                        HStack(spacing: 0) {
-                            // PDF preview panel (60%)
-                            ReferencesPanel(
-                                materials: materials,
-                                activeReferences: sessionViewModel.activeReferences,
-                                previewedFileName: sessionViewModel.previewedFileName,
-                                onClose: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        sessionViewModel.closePreview()
-                                    }
-                                },
-                                onClosePreview: {
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        sessionViewModel.closePreview()
-                                    }
-                                }
-                            )
-                            .frame(width: geometry.size.width * 0.6)
-                            
-                            Divider()
-                            
-                            // Chat panel (40%)
-                            ChatPanel(
-                                messages: sessionViewModel.messages,
-                                inputValue: $sessionViewModel.inputValue,
-                                isListening: sessionViewModel.isListening,
-                                isTyping: sessionViewModel.isTyping,
-                                onToggleListening: {
-                                    sessionViewModel.toggleListening()
-                                },
-                                onSendMessage: {
-                                    sessionViewModel.sendMessage(materials: materials)
-                                },
-                                onReferenceClick: { fileName in
-                                    withAnimation(.easeInOut(duration: 0.2)) {
-                                        if sessionViewModel.previewedFileName == fileName {
-                                            // If clicking the same file, close it
+                // Main content - dynamic layout with animation
+                Group {
+                    if let previewedFileName = sessionViewModel.previewedFileName,
+                       materials.first(where: { $0.name == previewedFileName }) != nil {
+                        // Split view: 60% PDF preview, 40% Chat
+                        GeometryReader { geometry in
+                            HStack(spacing: 0) {
+                                // PDF preview panel (60%)
+                                ReferencesPanel(
+                                    materials: materials,
+                                    activeReferences: sessionViewModel.activeReferences,
+                                    previewedFileName: sessionViewModel.previewedFileName,
+                                    onClose: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
                                             sessionViewModel.closePreview()
-                                        } else {
-                                            // Open the preview
-                                            sessionViewModel.openPreview(fileName: fileName)
+                                        }
+                                    },
+                                    onClosePreview: {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            sessionViewModel.closePreview()
                                         }
                                     }
-                                },
-                                shouldFocusInput: $sessionViewModel.shouldFocusInput
-                            )
-                            .onChange(of: sessionViewModel.inputValue) { oldValue, newValue in
-                                // Auto-send when text stabilizes during WhisperFlow monitoring
-                                // But only if not triggered by Fn key release
-                                if sessionViewModel.isMonitoringWhisperFlow && 
-                                   !sessionViewModel.shouldAutoSend &&
-                                   !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    // Cancel previous auto-send task
-                                    sessionViewModel.cancelAutoSend()
-                                    // Schedule new auto-send
-                                    sessionViewModel.scheduleAutoSend(materials: materials)
+                                )
+                                .frame(width: geometry.size.width * 0.6)
+                                .transition(.move(edge: .leading).combined(with: .opacity))
+                            
+                                Divider()
+                            
+                                // Chat panel (40%)
+                                ChatPanel(
+                                    messages: sessionViewModel.messages,
+                                    inputValue: $sessionViewModel.inputValue,
+                                    isListening: sessionViewModel.isListening,
+                                    isTyping: sessionViewModel.isTyping,
+                                    onToggleListening: {
+                                        sessionViewModel.toggleListening()
+                                    },
+                                    onSendMessage: {
+                                        sessionViewModel.sendMessage(materials: materials)
+                                    },
+                                    onReferenceClick: { fileName in
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            if sessionViewModel.previewedFileName == fileName {
+                                                // If clicking the same file, close it
+                                                sessionViewModel.closePreview()
+                                            } else {
+                                                // Open the preview
+                                                sessionViewModel.openPreview(fileName: fileName)
+                                            }
+                                        }
+                                    },
+                                    shouldFocusInput: $sessionViewModel.shouldFocusInput
+                                )
+                                .onChange(of: sessionViewModel.inputValue) { oldValue, newValue in
+                                    // Auto-send when text stabilizes during WhisperFlow monitoring
+                                    // But only if not triggered by Fn key release
+                                    if sessionViewModel.isMonitoringWhisperFlow && 
+                                       !sessionViewModel.shouldAutoSend &&
+                                       !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        // Cancel previous auto-send task
+                                        sessionViewModel.cancelAutoSend()
+                                        // Schedule new auto-send
+                                        sessionViewModel.scheduleAutoSend(materials: materials)
+                                    }
                                 }
-                            }
-                            .onChange(of: sessionViewModel.shouldAutoSend) { oldValue, shouldSend in
-                                // Fn key was released - send message immediately
-                                if shouldSend && !sessionViewModel.inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                    print("📤 ActiveSessionView: shouldAutoSend triggered, sending message...")
-                                    sessionViewModel.sendMessage(materials: materials)
-                                    sessionViewModel.shouldAutoSend = false
-                                    // Keep monitoring and overlay open for next message
-                                    // Don't stop monitoring or close overlay
-                                } else if shouldSend {
-                                    print("📤 ActiveSessionView: shouldAutoSend triggered but no text, resetting...")
-                                    sessionViewModel.shouldAutoSend = false
+                                .onChange(of: sessionViewModel.shouldAutoSend) { oldValue, shouldSend in
+                                    // Fn key was released - send message immediately
+                                    if shouldSend && !sessionViewModel.inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                        print("📤 ActiveSessionView: shouldAutoSend triggered, sending message...")
+                                        sessionViewModel.sendMessage(materials: materials)
+                                        sessionViewModel.shouldAutoSend = false
+                                        // Keep monitoring and overlay open for next message
+                                        // Don't stop monitoring or close overlay
+                                    } else if shouldSend {
+                                        print("📤 ActiveSessionView: shouldAutoSend triggered but no text, resetting...")
+                                        sessionViewModel.shouldAutoSend = false
+                                    }
                                 }
+                                .frame(width: geometry.size.width * 0.4)
                             }
-                            .frame(width: geometry.size.width * 0.4)
                         }
-                    }
-                } else {
-                    // Full-width chat
-                    ChatPanel(
-                        messages: sessionViewModel.messages,
-                        inputValue: $sessionViewModel.inputValue,
-                        isListening: sessionViewModel.isListening,
-                        isTyping: sessionViewModel.isTyping,
-                        onToggleListening: {
-                            sessionViewModel.toggleListening()
-                        },
-                        onSendMessage: {
-                            sessionViewModel.sendMessage(materials: materials)
-                        },
-                        onReferenceClick: { fileName in
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                sessionViewModel.openPreview(fileName: fileName)
+                    } else {
+                        // Full-width chat
+                        ChatPanel(
+                            messages: sessionViewModel.messages,
+                            inputValue: $sessionViewModel.inputValue,
+                            isListening: sessionViewModel.isListening,
+                            isTyping: sessionViewModel.isTyping,
+                            onToggleListening: {
+                                sessionViewModel.toggleListening()
+                            },
+                            onSendMessage: {
+                                sessionViewModel.sendMessage(materials: materials)
+                            },
+                            onReferenceClick: { fileName in
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    sessionViewModel.openPreview(fileName: fileName)
+                                }
+                            },
+                            shouldFocusInput: $sessionViewModel.shouldFocusInput
+                        )
+                        .onChange(of: sessionViewModel.inputValue) { oldValue, newValue in
+                            // Auto-send when text stabilizes during WhisperFlow monitoring
+                            // But only if not triggered by Fn key release
+                            if sessionViewModel.isMonitoringWhisperFlow && 
+                               !sessionViewModel.shouldAutoSend &&
+                               !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                // Cancel previous auto-send task
+                                sessionViewModel.cancelAutoSend()
+                                // Schedule new auto-send
+                                sessionViewModel.scheduleAutoSend(materials: materials)
                             }
-                        },
-                        shouldFocusInput: $sessionViewModel.shouldFocusInput
-                    )
-                    .onChange(of: sessionViewModel.inputValue) { oldValue, newValue in
-                        // Auto-send when text stabilizes during WhisperFlow monitoring
-                        // But only if not triggered by Fn key release
-                        if sessionViewModel.isMonitoringWhisperFlow && 
-                           !sessionViewModel.shouldAutoSend &&
-                           !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            // Cancel previous auto-send task
-                            sessionViewModel.cancelAutoSend()
-                            // Schedule new auto-send
-                            sessionViewModel.scheduleAutoSend(materials: materials)
                         }
-                    }
-                    .onChange(of: sessionViewModel.shouldAutoSend) { oldValue, shouldSend in
-                        // Auto-send triggered (from typing detection or Fn release)
-                        if shouldSend && !sessionViewModel.inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            print("📤 ActiveSessionView: shouldAutoSend triggered, sending message...")
-                            sessionViewModel.sendMessage(materials: materials)
-                            sessionViewModel.shouldAutoSend = false
-                            // Keep monitoring and overlay open for next message
-                            // Don't stop monitoring or close overlay
-                        } else if shouldSend {
-                            print("📤 ActiveSessionView: shouldAutoSend triggered but no text, resetting...")
-                            sessionViewModel.shouldAutoSend = false
+                        .onChange(of: sessionViewModel.shouldAutoSend) { oldValue, shouldSend in
+                            // Auto-send triggered (from typing detection or Fn release)
+                            if shouldSend && !sessionViewModel.inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                print("📤 ActiveSessionView: shouldAutoSend triggered, sending message...")
+                                sessionViewModel.sendMessage(materials: materials)
+                                sessionViewModel.shouldAutoSend = false
+                                // Keep monitoring and overlay open for next message
+                                // Don't stop monitoring or close overlay
+                            } else if shouldSend {
+                                print("📤 ActiveSessionView: shouldAutoSend triggered but no text, resetting...")
+                                sessionViewModel.shouldAutoSend = false
+                            }
                         }
                     }
                 }
             }
+            .animation(.easeInOut(duration: 0.3), value: sessionViewModel.previewedFileName)
         }
         .background(Color.appBackground)
         .onChange(of: sessionViewModel.shouldShowOverlay) { oldValue, shouldShow in
@@ -222,7 +235,8 @@ struct ActiveSessionView: View {
         ]),
         sessionViewModel: SessionViewModel(),
         onEndSession: {},
-        onBack: {}
+        onBack: {},
+        onUpdateMaterials: { _ in }
     )
     .frame(width: 1280, height: 800)
 }

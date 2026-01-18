@@ -11,6 +11,7 @@ struct ProjectsHubView: View {
     let projects: [Project]
     let onCreateProject: () -> Void
     let onSelectProject: (Project) -> Void
+    let onDeleteProject: (Project) -> Void
     
     var body: some View {
         ScrollView {
@@ -75,9 +76,15 @@ struct ProjectsHubView: View {
                             
                             // Existing project cards
                             ForEach(projects) { project in
-                                ProjectCard(project: project) {
-                                    onSelectProject(project)
-                                }
+                                ProjectCard(
+                                    project: project,
+                                    onSelect: {
+                                        onSelectProject(project)
+                                    },
+                                    onDelete: {
+                                        onDeleteProject(project)
+                                    }
+                                )
                             }
                         }
                     }
@@ -133,48 +140,70 @@ struct CreateProjectCard: View {
 struct ProjectCard: View {
     let project: Project
     let onSelect: () -> Void
+    let onDelete: () -> Void
     @State private var isHovering = false
     
     var body: some View {
-        Button(action: onSelect) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Image(systemName: "folder.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.appMutedForeground)
+        ZStack(alignment: .topTrailing) {
+            // Main card button
+            Button(action: onSelect) {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(.appMutedForeground)
+                        
+                        Spacer()
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(project.name)
+                            .font(.body.weight(.medium))
+                            .foregroundColor(.appForeground)
+                            .lineLimit(2)
+                        
+                        Text("\(project.materials.count) material\(project.materials.count == 1 ? "" : "s")")
+                            .font(.caption2)
+                            .foregroundColor(.appMutedForeground)
+                    }
                     
                     Spacer()
                 }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(project.name)
-                        .font(.body.weight(.medium))
-                        .foregroundColor(.appForeground)
-                        .lineLimit(2)
-                    
-                    Text("\(project.materials.count) material\(project.materials.count == 1 ? "" : "s")")
-                        .font(.caption2)
-                        .foregroundColor(.appMutedForeground)
-                }
-                
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .frame(height: 200)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.appSecondary)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .strokeBorder(
+                                    isHovering ? Color.white.opacity(0.3) : Color.appBorder,
+                                    lineWidth: 1
+                                )
+                        )
+                )
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .frame(height: 200)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.appSecondary)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .strokeBorder(
-                                isHovering ? Color.white.opacity(0.3) : Color.appBorder,
-                                lineWidth: 1
-                            )
+            .buttonStyle(.plain)
+            
+            // Delete button overlay (top-right corner) - appears on hover
+            Button(action: {
+                onDelete()
+            }) {
+                Image(systemName: "trash")
+                    .font(.system(size: 14))
+                    .foregroundColor(.appMutedForeground)
+                    .padding(6)
+                    .background(
+                        Circle()
+                            .fill(Color.appMuted.opacity(0.3))
                     )
-            )
+            }
+            .buttonStyle(.plain)
+            .padding(8)
+            .opacity(isHovering ? 1 : 0)
+            .animation(.easeInOut(duration: 0.15), value: isHovering)
         }
-        .buttonStyle(.plain)
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.15)) {
                 isHovering = hovering
@@ -190,7 +219,8 @@ struct ProjectCard: View {
             Project(name: "Math 201 - Calculus", materials: [])
         ],
         onCreateProject: {},
-        onSelectProject: { _ in }
+        onSelectProject: { _ in },
+        onDeleteProject: { _ in }
     )
     .frame(width: 1280, height: 800)
 }
