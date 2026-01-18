@@ -34,6 +34,7 @@ class SessionViewModel: ObservableObject {
     private let whisperFlowCapture = WhisperFlowCapture.shared
     private let fnKeyMonitor = FnKeyMonitor.shared
     private let elevenLabsService = ElevenLabsService.shared
+    private let screenCaptureService = ScreenCaptureService.shared
     private var inputValueObserver: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     
@@ -435,6 +436,18 @@ class SessionViewModel: ObservableObject {
         messages.append(userMessage)
         inputValue = "" // Clear input for next message
         isTyping = true
+        
+        // Capture screenshot after sending message (always capture regardless of sharing state)
+        Task { @MainActor in
+            print("📸 SessionViewModel: Initiating screenshot capture...")
+            if let screenshotURL = await screenCaptureService.captureScreen() {
+                print("📸 SessionViewModel: Screenshot captured at \(screenshotURL.path)")
+            } else {
+                print("⚠️ SessionViewModel: Screenshot capture failed")
+            }
+            // Cleanup old screenshots (keep last 50)
+            screenCaptureService.cleanupOldScreenshots(keepLast: 50)
+        }
         
         // Keep overlay open and refocus it for next message
         if shouldShowOverlay {
