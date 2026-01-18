@@ -260,6 +260,14 @@ struct MessageBubble: View {
                     }
                 }
                 
+                // Show compression stats for user messages
+                if message.role == .user, let stats = message.compressionStats, stats.totalOriginalTokens > 0 {
+                    Text("-\(stats.tokensSaved) tokens (\(String(format: "%.0f", stats.totalSavingsPercent))%)")
+                        .font(.caption2)
+                        .foregroundColor(.green.opacity(0.8))
+                        .padding(.top, 2)
+                }
+                
                 if let references = message.references, !references.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
                         ForEach(references, id: \.self) { reference in
