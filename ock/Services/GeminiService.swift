@@ -13,10 +13,16 @@ class GeminiService: ObservableObject {
     
             private var apiKey: String {
                 get {
-                    UserDefaults.standard.string(forKey: "gemini_api_key") ?? "AIzaSyDcvwCHlEqCHvOy6CRh1gjuYRUAeSbcNMc"
+                    // Always read from UserDefaults - no fallback to prevent caching old keys
+                    if let savedKey = UserDefaults.standard.string(forKey: "gemini_api_key"), !savedKey.isEmpty {
+                        return savedKey
+                    }
+                    // Return empty string if not set (will trigger error)
+                    return ""
                 }
                 set {
                     UserDefaults.standard.set(newValue, forKey: "gemini_api_key")
+                    UserDefaults.standard.synchronize() // Force immediate write
                 }
             }
     
@@ -28,13 +34,15 @@ class GeminiService: ObservableObject {
     }
     
     private func getModelsListURL() -> String {
-        let currentApiKey = apiKey
+        // Always read directly from UserDefaults (no caching)
+        let currentApiKey = UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
         return "https://generativelanguage.googleapis.com/v1beta/models?key=\(currentApiKey)"
     }
     
     /// Fetch available models from Gemini API
     func fetchAvailableModels() async throws -> [String] {
-        let currentApiKey = apiKey
+        // Always read directly from UserDefaults (no caching)
+        let currentApiKey = UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
         guard !currentApiKey.isEmpty else {
             throw GeminiError.apiKeyNotSet
         }
@@ -86,23 +94,30 @@ class GeminiService: ObservableObject {
     }
     
     private init() {
-        // Initialize API key if not set (user should set their own key)
-        if UserDefaults.standard.string(forKey: "gemini_api_key") == nil {
-            UserDefaults.standard.set("YOUR_GEMINI_API_KEY_HERE", forKey: "gemini_api_key")
-            print("⚠️ GeminiService: Using placeholder API key. Please set your Gemini API key.")
-        }
+        // Don't set a default key here - let OckCursorApp.init() set it
+        // This prevents caching old keys
     }
     
     /// Set the Gemini API key
     func setAPIKey(_ key: String) {
         UserDefaults.standard.set(key, forKey: "gemini_api_key")
+        UserDefaults.standard.synchronize() // Force immediate write to disk
         print("🔑 GeminiService: API Key set.")
+        print("   - Key preview: \(String(key.prefix(20)))...")
+        // Verify it was saved correctly
+        let savedKey = UserDefaults.standard.string(forKey: "gemini_api_key")
+        if savedKey == key {
+            print("   ✅ Key verified in UserDefaults")
+        } else {
+            print("   ⚠️ Key mismatch! Expected: \(String(key.prefix(20)))..., Got: \(String(savedKey?.prefix(20) ?? "nil"))...")
+        }
     }
     
     /// Get the current API key (for debugging)
     func getCurrentAPIKey() -> String {
-        let currentKey = apiKey
-        print("🔑 GeminiService: Current API key: \(String(currentKey.prefix(20)))...")
+        // Always read directly from UserDefaults (no caching)
+        let currentKey = UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
+        print("🔑 GeminiService: Current API key from UserDefaults: \(String(currentKey.prefix(20)))...")
         return currentKey
     }
     
@@ -111,19 +126,13 @@ class GeminiService: ObservableObject {
     ///   - text: The user's question/prompt
     ///   - imageBase64: Optional base64-encoded image (JPEG/PNG)
     ///   - mimeType: MIME type of the image (default: "image/jpeg")
-    ///   - conversationHistory: Optional array of previous messages for context
-    ///   - materialsContext: Optional relevant text from course materials
     /// - Returns: Generated text response
-    func generateContent(
-        text: String,
-        imageBase64: String? = nil,
-        mimeType: String = "image/jpeg",
-        conversationHistory: [ConversationMessage] = [],
-        materialsContext: String? = nil
-    ) async throws -> String {
-        let currentApiKey = apiKey
-        print("🔑 GeminiService: Using API key: \(String(currentApiKey.prefix(20)))...")
+    func generateContent(text: String, imageBase64: String? = nil, mimeType: String = "image/jpeg") async throws -> String {
+        // Always read directly from UserDefaults to ensure we get the latest key (no caching)
+        let currentApiKey = UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
+        print("🔑 GeminiService: Using API key from UserDefaults: \(String(currentApiKey.prefix(20)))...")
         guard !currentApiKey.isEmpty else {
+            print("   ⚠️ API key is empty! Make sure it's set in OckCursorApp.init()")
             throw GeminiError.apiKeyNotSet
         }
         
@@ -140,22 +149,16 @@ class GeminiService: ObservableObject {
         
         // Try each available model until one works
         var lastError: Error?
+        // Always read directly from UserDefaults (no caching)
+        let apiKeyForRequest = UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
         for modelName in availableModels {
             let baseURL = getBaseURL(for: modelName)
-            guard let url = URL(string: "\(baseURL)?key=\(currentApiKey)") else {
+            guard let url = URL(string: "\(baseURL)?key=\(apiKeyForRequest)") else {
                 continue
             }
             
             do {
-                return try await makeRequest(
-                    url: url,
-                    text: text,
-                    imageBase64: imageBase64,
-                    mimeType: mimeType,
-                    modelName: modelName,
-                    conversationHistory: conversationHistory,
-                    materialsContext: materialsContext
-                )
+                return try await makeRequest(url: url, text: text, imageBase64: imageBase64, mimeType: mimeType, modelName: modelName)
             } catch {
                 lastError = error
                 // If it's a 404 (model not found), try next model
@@ -174,89 +177,31 @@ class GeminiService: ObservableObject {
         throw lastError ?? GeminiError.apiError(statusCode: 404, message: "No available models found")
     }
     
-    private func makeRequest(
-        url: URL,
-        text: String,
-        imageBase64: String?,
-        mimeType: String,
-        modelName: String,
-        conversationHistory: [ConversationMessage],
-        materialsContext: String?
-    ) async throws -> String {
+    private func makeRequest(url: URL, text: String, imageBase64: String?, mimeType: String, modelName: String) async throws -> String {
         
-        // Build system instruction with course materials context
-        var systemInstruction = """
-You are a chill teaching assistant who helps students LEARN, not just get answers.
+        // Build request body according to Gemini API spec
+        // System prompt for casual TA behavior - keep responses SHORT
+        let systemPrompt = """
+You are a chill teaching assistant helping a student. Look at their screen and respond naturally.
 
-TEACHING PHILOSOPHY (CRITICAL):
-- NEVER give the direct answer or solution right away
-- Use the Socratic method: ask guiding questions that lead them to discover the answer
-- Give hints and nudges, not solutions
-- Help them understand the WHY, not just the WHAT
-- If they're stuck on a problem, ask "What have you tried?" or "What part is confusing you?"
-- When they're on the right track, encourage them: "Yeah, you're thinking about it right"
-- Only give more direct help if they're really struggling after a few exchanges
+RULES:
+- Keep it SHORT: 1-2 sentences MAX (under 25 words)
+- Be casual and friendly, like a friend helping out
+- If they just ask what you see, briefly acknowledge it and offer help
+- Only give detailed explanations if they ask a specific question
+- No formal language, no bullet points, no lengthy explanations
 
-RESPONSE STYLE:
-- Keep it SHORT - 1-2 sentences max, like a real conversation
-- Casual tone, like a friend who's good at this subject
-- Ask ONE guiding question at a time, don't overwhelm
-- Speak naturally, ready for text-to-speech (no bullet points, no markdown)
-- Remember what they've told you in this conversation
-
-EXAMPLES OF GOOD RESPONSES:
-- "Hmm, what do you think happens to x when you plug in that value?"
-- "You're close! What's the relationship between these two terms?"
-- "Before solving, what's this equation actually asking you to find?"
-- "Nice, you got the setup right. Now what's the next step you'd try?"
-
-EXAMPLES OF BAD RESPONSES (DON'T DO THIS):
-- "The answer is 42" (too direct)
-- "First do X, then Y, then Z" (solving it for them)
-- "Here's how to solve it: ..." (giving away the solution)
+User says: \(text)
 """
+        let promptText = systemPrompt
         
-        // Add course materials context if available
-        if let materials = materialsContext, !materials.isEmpty {
-            systemInstruction += """
-
-
-COURSE MATERIALS CONTEXT:
-Use this information from the student's course materials to answer their questions. Reference specific parts when relevant.
-
-\(materials)
-
----
-When answering, prioritize information from these course materials. If the answer isn't in the materials, you can use general knowledge but mention that.
-"""
-            print("📚 GeminiService: Including \(materials.count) chars of materials context")
-        }
-        
-        // Build conversation history for multi-turn
-        var contents: [[String: Any]] = []
-        
-        // Add previous messages (limit to last 10 for speed)
-        let recentHistory = conversationHistory.suffix(10)
-        if !recentHistory.isEmpty {
-            print("💬 GeminiService: Including \(recentHistory.count) messages of conversation history")
-        }
-        
-        for message in recentHistory {
-            let role = message.role == "user" ? "user" : "model"
-            contents.append([
-                "role": role,
-                "parts": [["text": message.content]]
-            ])
-        }
-        
-        // Add current message with optional image
-        var currentParts: [[String: Any]] = [
-            ["text": text]
+        var parts: [[String: Any]] = [
+            ["text": promptText]
         ]
         
-        // Add image part if provided
+        // Add image part if provided (using inlineData, not inline_data)
         if let imageBase64 = imageBase64 {
-            currentParts.append([
+            parts.append([
                 "inlineData": [
                     "mimeType": mimeType,
                     "data": imageBase64
@@ -264,15 +209,12 @@ When answering, prioritize information from these course materials. If the answe
             ])
         }
         
-        contents.append([
-            "role": "user",
-            "parts": currentParts
-        ])
-        
         let requestBody: [String: Any] = [
-            "contents": contents,
-            "systemInstruction": [
-                "parts": [["text": systemInstruction]]
+            "contents": [
+                [
+                    "role": "user",
+                    "parts": parts
+                ]
             ],
             "generationConfig": [
                 "temperature": 0.7
