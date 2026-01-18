@@ -34,6 +34,8 @@ class SessionViewModel: ObservableObject {
     private let whisperFlowCapture = WhisperFlowCapture.shared
     private let fnKeyMonitor = FnKeyMonitor.shared
     private let elevenLabsService = ElevenLabsService.shared
+    private let geminiService = GeminiService.shared
+    private let screenshotCapture = ScreenshotCapture.shared
     private var inputValueObserver: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     
@@ -432,6 +434,7 @@ class SessionViewModel: ObservableObject {
             content: inputValue
         )
         
+        let userQuestion = inputValue // Save the question before clearing
         messages.append(userMessage)
         inputValue = "" // Clear input for next message
         isTyping = true
@@ -451,31 +454,96 @@ class SessionViewModel: ObservableObject {
         // Cancel any existing typing task
         typingTask?.cancel()
         
-        // Simulate AI response
-        let task = DispatchWorkItem { [weak self] in
+        // Capture screenshot and call Gemini
+        Task { [weak self] in
             guard let self = self else { return }
             
-            // Dummy: randomly select a reference for demo purposes
-            let refs = materials.isEmpty ? [] : [materials.randomElement()?.name ?? "Course Notes"]
+            print("📸 sendMessage: Capturing screenshot...")
+            print("   - ScreenshotCapture.hasPermission: \(self.screenshotCapture.hasPermission)")
             
-            let responses = [
-                "I see what you're looking at. Let me break this down step by step...",
-                "Great question! Based on your lecture notes, this concept relates to...",
-                "Looking at that equation, here's what each part means...",
-                "I can see you're stuck on that part. Let me explain it differently...",
-            ]
+            // Check permission status first
+            if !self.screenshotCapture.hasPermission {
+                print("⚠️ sendMessage: Permission not granted, checking again...")
+                await self.screenshotCapture.checkAndRequestPermission()
+                
+                if !self.screenshotCapture.hasPermission {
+                    print("⚠️ sendMessage: Still no permission after check")
+                    await MainActor.run {
+                        let permissionMessage = ChatMessage(
+                            role: .assistant,
+                            content: "I couldn't capture your screen because screen recording permission is not granted. Please enable 'ock' in System Settings > Privacy & Security > Screen Recording, then restart the app. For now, I'll answer without seeing your screen."
+                        )
+                        self.messages.append(permissionMessage)
+                    }
+                    await self.callGemini(text: userQuestion, imageBase64: nil, materials: materials)
+                    return
+                }
+            }
             
-            // Use the new function to add message with references
-            self.addAssistantMessage(
-                content: responses.randomElement() ?? responses[0],
-                references: refs.isEmpty ? nil : refs
-            )
+            // Capture screenshot (async)
+            guard let screenshotBase64 = await self.screenshotCapture.captureScreenAsBase64(compressionQuality: 0.8) else {
+                print("⚠️ sendMessage: Failed to capture screenshot")
+                
+                // Update permission status - might have been revoked
+                await self.screenshotCapture.checkAndRequestPermission()
+                
+                // Show user-friendly message about permission
+                await MainActor.run {
+                    let permissionMessage = ChatMessage(
+                        role: .assistant,
+                        content: "I couldn't capture your screen. Please make sure screen recording permission is enabled in System Settings > Privacy & Security > Screen Recording. For now, I'll answer without seeing your screen."
+                    )
+                    self.messages.append(permissionMessage)
+                }
+                
+                // Continue without screenshot
+                await self.callGemini(text: userQuestion, imageBase64: nil, materials: materials)
+                return
+            }
             
-            self.isTyping = false
+            print("✅ sendMessage: Screenshot captured successfully")
+            
+            // Call Gemini with text and screenshot
+            await self.callGemini(text: userQuestion, imageBase64: screenshotBase64, materials: materials)
         }
-        
-        typingTask = task
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5, execute: task)
+    }
+    
+    private func callGemini(text: String, imageBase64: String?, materials: [UploadedMaterial]) async {
+        do {
+            print("🔮 SessionViewModel: Calling Gemini API...")
+            let response = try await geminiService.generateContent(text: text, imageBase64: imageBase64)
+            
+            await MainActor.run {
+                print("✅ SessionViewModel: Received response from Gemini")
+                
+                // Check if any materials were referenced (simple keyword matching for now)
+                let refs = materials.filter { material in
+                    response.localizedCaseInsensitiveContains(material.name) ||
+                    material.name.localizedCaseInsensitiveContains(response)
+                }.map { $0.name }
+                
+                // Add assistant message with response
+                self.addAssistantMessage(
+                    content: response,
+                    references: refs.isEmpty ? nil : refs
+                )
+                
+                self.isTyping = false
+            }
+        } catch {
+            await MainActor.run {
+                print("❌ SessionViewModel: Gemini API call failed")
+                print("   - Error: \(error.localizedDescription)")
+                
+                // Fallback to error message
+                self.addAssistantMessage(
+                    content: "Sorry, I encountered an error: \(error.localizedDescription). Please check your Gemini API key in settings.",
+                    references: nil
+                )
+                
+            self.isTyping = false
+            }
+        }
     }
     
     func openPreview(fileName: String) {
