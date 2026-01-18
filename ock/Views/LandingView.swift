@@ -144,6 +144,32 @@ struct FeatureHint: View {
 
 struct TestEnvironmentView: View {
     let onBack: () -> Void
+    
+    @State private var connectionStatus: ConnectionStatus = .unknown
+    @State private var lastResponse: String = ""
+    @State private var messageCount: Int = 0
+
+    enum ConnectionStatus {
+        case unknown, checking, connected, disconnected
+        
+        var color: Color {
+            switch self {
+            case .unknown: return .gray
+            case .checking: return .yellow
+            case .connected: return .green
+            case .disconnected: return .red
+            }
+        }
+        
+        var text: String {
+            switch self {
+            case .unknown: return "Not checked"
+            case .checking: return "Checking..."
+            case .connected: return "Connected"
+            case .disconnected: return "Disconnected"
+            }
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -160,23 +186,161 @@ struct TestEnvironmentView: View {
                 .buttonStyle(.plain)
 
                 Spacer()
+                
+                // Connection status indicator
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(connectionStatus.color)
+                        .frame(width: 8, height: 8)
+                    Text(connectionStatus.text)
+                        .font(.caption)
+                        .foregroundColor(.appMutedForeground)
+                }
             }
             .padding()
 
             Spacer()
 
-            VStack(spacing: 12) {
-                Text("Test Environment")
-                    .font(.system(size: 32, weight: .medium))
-                    .foregroundColor(.appForeground)
-                Text("Use this space to try out APIs and sponsor integrations.")
-                    .font(.body)
-                    .foregroundColor(.appMutedForeground)
+            VStack(spacing: 24) {
+                VStack(spacing: 12) {
+                    Text("Test Environment")
+                        .font(.system(size: 32, weight: .medium))
+                        .foregroundColor(.appForeground)
+                    Text("Use this space to try out APIs and sponsor integrations.")
+                        .font(.body)
+                        .foregroundColor(.appMutedForeground)
+                }
+                
+                // Backend test section
+                VStack(spacing: 16) {
+                    Text("Backend Connection Test")
+                        .font(.headline)
+                        .foregroundColor(.appForeground)
+                    
+                    Text("Make sure the backend is running:\ncd backend && npm install && npm start")
+                        .font(.caption)
+                        .foregroundColor(.appMutedForeground)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    HStack(spacing: 12) {
+                        // Health check button
+                        Button(action: checkHealth) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "heart.fill")
+                                    .font(.system(size: 16))
+                                Text("Check Health")
+                                    .font(.body.weight(.medium))
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 20)
+                            .frame(height: 44)
+                            .background(Color.white)
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Send message button
+                        Button(action: sendTestMessage) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 16))
+                                Text("Send Test Message")
+                                    .font(.body.weight(.medium))
+                            }
+                            .foregroundColor(.appForeground)
+                            .padding(.horizontal, 20)
+                            .frame(height: 44)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.appMutedForeground, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    
+                    // Response display
+                    if !lastResponse.isEmpty {
+                        VStack(spacing: 8) {
+                            Text("Last Response:")
+                                .font(.caption)
+                                .foregroundColor(.appMutedForeground)
+                            Text(lastResponse)
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.appForeground)
+                                .padding(12)
+                                .frame(maxWidth: 400)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8)
+                                        .fill(Color.appSecondary)
+                                )
+                        }
+                    }
+                    
+                    if messageCount > 0 {
+                        Text("Messages sent: \(messageCount)")
+                            .font(.caption)
+                            .foregroundColor(.appMutedForeground)
+                    }
+                }
+                .padding(32)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.appSurface)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.appBorder, lineWidth: 1)
+                        )
+                )
             }
 
             Spacer()
         }
         .padding(.horizontal, 32)
+    }
+    
+    private func checkHealth() {
+        connectionStatus = .checking
+        lastResponse = ""
+        
+        Task {
+            do {
+                let isHealthy = try await BackendService.shared.healthCheck()
+                await MainActor.run {
+                    connectionStatus = isHealthy ? .connected : .disconnected
+                    lastResponse = isHealthy ? "✅ Backend is healthy!" : "❌ Backend returned unhealthy status"
+                }
+            } catch {
+                await MainActor.run {
+                    connectionStatus = .disconnected
+                    lastResponse = "❌ Error: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func sendTestMessage() {
+        let message = "Hello from ock app! Test message #\(messageCount + 1)"
+        
+        Task {
+            do {
+                let success = try await BackendService.shared.sendLogMessage(message, source: "TestEnvironment")
+                await MainActor.run {
+                    if success {
+                        messageCount += 1
+                        lastResponse = "✅ Message sent successfully!\nCheck your backend logs."
+                        connectionStatus = .connected
+                    } else {
+                        lastResponse = "❌ Message send failed"
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    connectionStatus = .disconnected
+                    lastResponse = "❌ Error: \(error.localizedDescription)"
+                }
+            }
+        }
     }
 }
 
