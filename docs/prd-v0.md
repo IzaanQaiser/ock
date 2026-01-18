@@ -109,10 +109,6 @@ References to notes/textbook sections
 Optional worked example
 
 7. Sponsor Software Used
-Overshoot (real-time screen understanding)
-What it does: Takes a live screen/video feed and lets an AI “see” what’s on it.
-How ock uses it: Your study session streams the screen → Overshoot extracts what’s visible (equations/text/diagrams) so “this equation right here” has real context.
-What you still code: screen capture UI + permissions, selecting which on-screen region/snippet is “the target,” disambiguation (“top one or bottom one?”), and stitching screen context into your TA prompt/retrieval pipeline.
 Wispr Flow (speech → text)
 What it does: Converts the student’s voice into text quickly/accurately.
 How ock uses it: Student talks normally → Wispr produces the transcript you feed into your TA logic.
@@ -128,11 +124,9 @@ What you still code: document ingestion (PDF → text), chunking, embeddings/RAG
 
 8. Targets Tracks to Win
 Education Main: $2000, $1000, $500
-Overshoot Sponsor: Meta Ray Bans, CR Battle Pass, Times Square Billboard (1/5)
 Wispr Flow Sponsor: 1 Year wispr flow pro, unique key, wispr swag (2/5)
 ElevenLabs: 6 Months of ElevenLabs Scale tier (3/5)
 The Token Company: $1000, $500, $500
-Best UI/UX: $1000
 
 9. Additional Things To Do
 Recommendation from Zak : expand on what this can do in the future and stuff
