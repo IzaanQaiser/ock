@@ -23,6 +23,7 @@ class SessionViewModel: ObservableObject {
     @Published var shouldFocusInput: Bool = false
     @Published var shouldAutoSend: Bool = false
     @Published var shouldShowOverlay: Bool = false
+    @Published var currentPlayingMessageId: String? = nil // Track which message is playing TTS
     
     private var typingTask: DispatchWorkItem?
     private var autoSendTask: DispatchWorkItem?
@@ -32,13 +33,32 @@ class SessionViewModel: ObservableObject {
     private var lastInputValue = ""
     private let whisperFlowCapture = WhisperFlowCapture.shared
     private let fnKeyMonitor = FnKeyMonitor.shared
+    private let elevenLabsService = ElevenLabsService.shared
     private var inputValueObserver: AnyCancellable?
+    private var cancellables = Set<AnyCancellable>()
     
     init() {
         checkScreenSharePermission()
         setupWhisperFlowCapture()
         setupInputValueMonitoring()
         setupFnKeyMonitoring()
+        setupTTSMonitoring()
+    }
+    
+    private func setupTTSMonitoring() {
+        // Sync the service's playback state to the view model
+        elevenLabsService.$currentPlayingMessageId
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$currentPlayingMessageId)
+        
+        // Also sync isPlaying state if needed
+        elevenLabsService.$isPlaying
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isPlaying in
+                // Can use this for UI indicators if needed
+                print("🔊 TTS isPlaying: \(isPlaying)")
+            }
+            .store(in: &cancellables)
     }
     
     private func setupFnKeyMonitoring() {
@@ -263,7 +283,6 @@ class SessionViewModel: ObservableObject {
         autoSendTask = nil
     }
     
-    private var cancellables = Set<AnyCancellable>()
     
     func checkScreenSharePermission() {
         // On macOS, we check screen recording permission by trying to create a screen capture
@@ -379,6 +398,27 @@ class SessionViewModel: ObservableObject {
         if let refs = references, !refs.isEmpty {
             addReferences(refs)
         }
+        
+        // Automatically play TTS for assistant messages
+        Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                print("🔊 SessionViewModel: Starting TTS for assistant message")
+                print("   - Message ID: \(assistantMessage.id)")
+                print("   - Content length: \(content.count) characters")
+                print("   - Content preview: \(content.prefix(100))...")
+                
+                try await self.elevenLabsService.speak(text: content, messageId: assistantMessage.id)
+                
+                print("✅ SessionViewModel: TTS playback started successfully")
+            } catch {
+                print("⚠️ SessionViewModel: Failed to play TTS")
+                print("   - Error: \(error.localizedDescription)")
+                if let elevenLabsError = error as? ElevenLabsError {
+                    print("   - Error type: \(elevenLabsError)")
+                }
+            }
+        }
     }
     
     func sendMessage(materials: [UploadedMaterial]) {
@@ -393,7 +433,6 @@ class SessionViewModel: ObservableObject {
         )
         
         messages.append(userMessage)
-        let messageText = inputValue // Save the text before clearing
         inputValue = "" // Clear input for next message
         isTyping = true
         
@@ -457,7 +496,9 @@ class SessionViewModel: ObservableObject {
         previewedFileName = nil
         isMonitoringWhisperFlow = false
         shouldAutoSend = false
+        currentPlayingMessageId = nil
         stopWhisperFlowMonitoring()
+        elevenLabsService.stop() // Stop any playing TTS
         typingTask?.cancel()
         autoSendTask?.cancel()
         fnReleaseDelayTask?.cancel()
@@ -469,6 +510,8 @@ class SessionViewModel: ObservableObject {
         autoSendTask?.cancel()
         fnReleaseDelayTask?.cancel()
         typingTimer?.invalidate()
+        cancellables.removeAll()
         fnKeyMonitor.stopMonitoring()
+        elevenLabsService.stop() // Stop TTS on deinit
     }
 }

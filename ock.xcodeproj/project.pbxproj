@@ -28,6 +28,7 @@
 		7D6FFC782F1C19C500F9FA84 /* ockTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ockTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D6FFC822F1C19C500F9FA84 /* ockUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ockUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7D6FFCBB2F1C1B0900F9FA84 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		7D6FFCCC2F1C1B0900F9FA84 /* ock.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ock.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -81,6 +82,7 @@
 				7D6FFC852F1C19C500F9FA84 /* ockUITests */,
 				7D6FFC6C2F1C19C200F9FA84 /* Products */,
 				7D6FFCBB2F1C1B0900F9FA84 /* Info.plist */,
+				7D6FFCCC2F1C1B0900F9FA84 /* ock.entitlements */,
 			);
 			sourceTree = "<group>";
 		};
@@ -394,6 +396,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ock.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
@@ -424,6 +427,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ock.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;

@@ -43,7 +43,7 @@ struct ActiveSessionView: View {
                 
                 // Main content - dynamic layout
                 if let previewedFileName = sessionViewModel.previewedFileName,
-                   let material = materials.first(where: { $0.name == previewedFileName }) {
+                   materials.first(where: { $0.name == previewedFileName }) != nil {
                     // Split view: 60% PDF preview, 40% Chat
                     GeometryReader { geometry in
                         HStack(spacing: 0) {
@@ -93,7 +93,7 @@ struct ActiveSessionView: View {
                                 },
                                 shouldFocusInput: $sessionViewModel.shouldFocusInput
                             )
-                            .onChange(of: sessionViewModel.inputValue) { newValue in
+                            .onChange(of: sessionViewModel.inputValue) { oldValue, newValue in
                                 // Auto-send when text stabilizes during WhisperFlow monitoring
                                 // But only if not triggered by Fn key release
                                 if sessionViewModel.isMonitoringWhisperFlow && 
@@ -105,7 +105,7 @@ struct ActiveSessionView: View {
                                     sessionViewModel.scheduleAutoSend(materials: materials)
                                 }
                             }
-                            .onChange(of: sessionViewModel.shouldAutoSend) { shouldSend in
+                            .onChange(of: sessionViewModel.shouldAutoSend) { oldValue, shouldSend in
                                 // Fn key was released - send message immediately
                                 if shouldSend && !sessionViewModel.inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                     print("📤 ActiveSessionView: shouldAutoSend triggered, sending message...")
@@ -142,7 +142,7 @@ struct ActiveSessionView: View {
                         },
                         shouldFocusInput: $sessionViewModel.shouldFocusInput
                     )
-                    .onChange(of: sessionViewModel.inputValue) { newValue in
+                    .onChange(of: sessionViewModel.inputValue) { oldValue, newValue in
                         // Auto-send when text stabilizes during WhisperFlow monitoring
                         // But only if not triggered by Fn key release
                         if sessionViewModel.isMonitoringWhisperFlow && 
@@ -154,7 +154,7 @@ struct ActiveSessionView: View {
                             sessionViewModel.scheduleAutoSend(materials: materials)
                         }
                     }
-                    .onChange(of: sessionViewModel.shouldAutoSend) { shouldSend in
+                    .onChange(of: sessionViewModel.shouldAutoSend) { oldValue, shouldSend in
                         // Auto-send triggered (from typing detection or Fn release)
                         if shouldSend && !sessionViewModel.inputValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             print("📤 ActiveSessionView: shouldAutoSend triggered, sending message...")
@@ -171,7 +171,7 @@ struct ActiveSessionView: View {
             }
         }
         .background(Color.appBackground)
-        .onChange(of: sessionViewModel.shouldShowOverlay) { shouldShow in
+        .onChange(of: sessionViewModel.shouldShowOverlay) { oldValue, shouldShow in
             print("📱 ActiveSessionView: shouldShowOverlay changed to \(shouldShow)")
             print("   - Current thread: \(Thread.isMainThread ? "Main" : "Background")")
             
@@ -205,7 +205,7 @@ struct ActiveSessionView: View {
                 )
             }
         }
-        .onChange(of: sessionViewModel.shouldAutoSend) { shouldSend in
+        .onChange(of: sessionViewModel.shouldAutoSend) { oldValue, shouldSend in
             // Don't close overlay when sending - keep it open for next message
             // The overlay will be cleared and refocused by sendMessage
         }

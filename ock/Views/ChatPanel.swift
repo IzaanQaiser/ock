@@ -19,6 +19,7 @@ struct ChatPanel: View {
     
     @FocusState private var isInputFocused: Bool
     @Binding var shouldFocusInput: Bool
+    @StateObject private var elevenLabsService = ElevenLabsService.shared
     
     init(
         messages: [ChatMessage],
@@ -75,7 +76,27 @@ struct ChatPanel: View {
                         ForEach(messages) { message in
                             MessageBubble(
                                 message: message,
-                                onReferenceClick: onReferenceClick
+                                onReferenceClick: onReferenceClick,
+                                isPlaying: elevenLabsService.isPlaying && elevenLabsService.currentPlayingMessageId == message.id,
+                                onPlayPause: {
+                                    if elevenLabsService.currentPlayingMessageId == message.id && elevenLabsService.isPlaying {
+                                        elevenLabsService.pause()
+                                    } else if elevenLabsService.currentPlayingMessageId == message.id {
+                                        elevenLabsService.resume()
+                                    } else {
+                                        // Play this message
+                                        Task {
+                                            do {
+                                                try await elevenLabsService.speak(text: message.content, messageId: message.id)
+                                            } catch {
+                                                print("⚠️ Failed to play TTS: \(error.localizedDescription)")
+                                            }
+                                        }
+                                    }
+                                },
+                                onStop: {
+                                    elevenLabsService.stop()
+                                }
                             )
                                 .id(message.id)
                         }
@@ -190,8 +211,12 @@ struct ChatPanel: View {
 struct MessageBubble: View {
     let message: ChatMessage
     let onReferenceClick: ((String) -> Void)?
+    let isPlaying: Bool
+    let onPlayPause: () -> Void
+    let onStop: () -> Void
     
     @State private var hoveredReference: String? = nil
+    @State private var isHovering = false
     
     var body: some View {
         HStack {
@@ -200,15 +225,48 @@ struct MessageBubble: View {
             }
             
             VStack(alignment: message.role == .user ? .trailing : .leading, spacing: 0) {
-                Text(message.content)
-                    .font(.body)
-                    .foregroundColor(message.role == .user ? .black : .appForeground)
-                    .padding(12)
-                    .frame(maxWidth: 400, alignment: .leading)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(message.role == .user ? Color.white : Color.appSecondary)
-                    )
+                HStack(alignment: .top, spacing: 8) {
+                    Text(message.content)
+                        .font(.body)
+                        .foregroundColor(message.role == .user ? .black : .appForeground)
+                        .frame(maxWidth: 400, alignment: .leading)
+                    
+                    // Audio controls for assistant messages
+                    if message.role == .assistant {
+                        HStack(spacing: 4) {
+                            // Play/Pause button
+                            Button(action: onPlayPause) {
+                                Image(systemName: isPlaying ? "pause.fill" : "play.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.appMutedForeground)
+                                    .frame(width: 20, height: 20)
+                            }
+                            .buttonStyle(.plain)
+                            .opacity(isHovering ? 1.0 : 0.6)
+                            
+                            // Stop button
+                            Button(action: onStop) {
+                                Image(systemName: "stop.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.appMutedForeground)
+                                    .frame(width: 20, height: 20)
+                            }
+                            .buttonStyle(.plain)
+                            .opacity(isHovering ? 1.0 : 0.6)
+                        }
+                        .padding(.trailing, 4)
+                    }
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(message.role == .user ? Color.white : Color.appSecondary)
+                )
+                .onHover { hovering in
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        isHovering = hovering
+                    }
+                }
                 
                 if let references = message.references, !references.isEmpty {
                     VStack(alignment: .leading, spacing: 4) {
@@ -265,4 +323,5 @@ struct MessageBubble: View {
         shouldFocusInput: .constant(false)
     )
     .frame(width: 640, height: 600)
+    .environmentObject(ElevenLabsService.shared)
 }
