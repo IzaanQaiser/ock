@@ -13,23 +13,37 @@ struct ProjectView: View {
     let onUpdateMaterials: ([UploadedMaterial]) -> Void
     let onBack: () -> Void
     
-    @State private var isSessionActive = false
+    @State private var isSessionActive = true // Start with session active by default
     @StateObject private var sessionViewModel = SessionViewModel()
     @StateObject private var materialsViewModel = MaterialsViewModel()
     
     var body: some View {
         Group {
             if isSessionActive {
-                // Active session view
+                // Active session view (chat view) - stays here, mic button just toggles mic
                 ActiveSessionView(
                     materials: $materials,
                     sessionViewModel: sessionViewModel,
                     onEndSession: {
-                        withAnimation(.easeInOut(duration: 0.2)) {
+                        // Only used if we need to go back to project overview (not triggered by mic button)
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             isSessionActive = false
+                            sessionViewModel.clearSession()
+                        }
+                    },
+                    onBack: {
+                        // Go back to projects hub
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            isSessionActive = false
+                            sessionViewModel.clearSession()
+                            onBack()
                         }
                     }
                 )
+                .transition(.asymmetric(
+                    insertion: .scale(scale: 0.95).combined(with: .opacity),
+                    removal: .scale(scale: 1.05).combined(with: .opacity)
+                ))
             } else {
                 // Project overview
                 HStack(spacing: 0) {
@@ -80,28 +94,32 @@ struct ProjectView: View {
                                             .foregroundColor(.appMutedForeground)
                                     }
                                     
-                                    // Start session button
+                                    // Start session button (mic on)
                                     Button(action: {
-                                        withAnimation(.easeInOut(duration: 0.2)) {
+                                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                             isSessionActive = true
+                                            // Start with mic on and overlay on by default
+                                            sessionViewModel.isListening = true
+                                            sessionViewModel.shouldShowOverlay = true
+                                            sessionViewModel.startWhisperFlowMonitoring()
                                         }
                                     }) {
                                         HStack(spacing: 12) {
-                                            Image(systemName: "play.fill")
+                                            Image(systemName: "mic.fill")
                                                 .font(.system(size: 20))
-                                            Text("Start Session")
+                                            Text("Start Voice Session")
                                                 .font(.body.weight(.medium))
                                         }
-                                        .foregroundColor(.black)
+                                        .foregroundColor(.white)
                                         .padding(.horizontal, 32)
                                         .frame(height: 56)
-                                        .background(Color.white)
+                                        .background(Color.red)
                                         .cornerRadius(12)
                                     }
                                     .buttonStyle(.plain)
                                     
                                     // Info text
-                                    Text("Start a session to begin chatting with ock about your materials")
+                                    Text("Start a voice session to begin chatting with ock about your materials")
                                         .font(.caption)
                                         .foregroundColor(.appMutedForeground)
                                         .multilineTextAlignment(.center)
@@ -121,6 +139,12 @@ struct ProjectView: View {
         }
         .onAppear {
             materialsViewModel.materials = materials
+            // Auto-start session when project view appears
+            if !sessionViewModel.isListening {
+                sessionViewModel.isListening = true
+                sessionViewModel.shouldShowOverlay = true
+                sessionViewModel.startWhisperFlowMonitoring()
+            }
         }
     }
 }

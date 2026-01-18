@@ -8,10 +8,10 @@
 import SwiftUI
 
 struct SessionHeaderView: View {
-    let isSharing: Bool
-    let hasPermission: Bool
-    let onToggleShare: () -> Void
+    let isListening: Bool
+    let onToggleListening: () -> Void
     let onEndSession: () -> Void
+    let onBack: () -> Void
     
     @State private var pulseOpacity: Double = 0.5
     
@@ -19,6 +19,23 @@ struct SessionHeaderView: View {
         HStack {
             // Left side
             HStack(spacing: 12) {
+                // Back button
+                Button(action: onBack) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 14))
+                        Text("Projects")
+                            .font(.caption)
+                    }
+                    .foregroundColor(.appMutedForeground)
+                }
+                .buttonStyle(.plain)
+                
+                // Divider
+                Rectangle()
+                    .fill(Color.appBorder)
+                    .frame(width: 1, height: 20)
+                
                 // Logo
                 RoundedRectangle(cornerRadius: 8)
                     .fill(Color.white)
@@ -34,14 +51,14 @@ struct SessionHeaderView: View {
                     .fill(Color.appBorder)
                     .frame(width: 1, height: 20)
                 
-                // Status indicator
+                // Status indicator (tied to mic state)
                 HStack(spacing: 8) {
                     Circle()
-                        .fill(isSharing ? Color.appSuccess : Color.appMutedForeground)
+                        .fill(isListening ? Color.appSuccess : Color.appMutedForeground)
                         .frame(width: 8, height: 8)
-                        .opacity(isSharing ? pulseOpacity : 1.0)
+                        .opacity(isListening ? pulseOpacity : 1.0)
                     
-                    Text(isSharing ? "Session active" : "Not sharing")
+                    Text(isListening ? "Session active" : "Session inactive")
                         .font(.caption)
                         .foregroundColor(.appMutedForeground)
                 }
@@ -49,40 +66,22 @@ struct SessionHeaderView: View {
             
             Spacer()
             
-            // Right side - Screen share and End session buttons
+            // Right side - Mic (start/end session) button
             HStack(spacing: 12) {
-                // Screen share button
-                Button(action: onToggleShare) {
+                // Microphone button (start/end session) - just toggles mic, doesn't change view
+                Button(action: onToggleListening) {
                     HStack(spacing: 8) {
-                        Image(systemName: "display")
+                        Image(systemName: isListening ? "mic.fill" : "mic")
                             .font(.system(size: 16))
-                        Text(hasPermission ? (isSharing ? "Stop sharing" : "Share") : "Manage")
+                        Text(isListening ? "Stop Session" : "Start Session")
                             .font(.caption)
                     }
-                    .foregroundColor(.appMutedForeground)
+                    .foregroundColor(isListening ? .white : .appMutedForeground)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.clear)
-                    )
-                }
-                .buttonStyle(.plain)
-                
-                // End session button
-                Button(action: onEndSession) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "square.fill")
-                            .font(.system(size: 16))
-                        Text("End session")
-                            .font(.caption)
-                    }
-                    .foregroundColor(.appMutedForeground)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6)
-                            .fill(Color.clear)
+                            .fill(isListening ? Color.red : Color.clear)
                     )
                 }
                 .buttonStyle(.plain)
@@ -98,11 +97,11 @@ struct SessionHeaderView: View {
             alignment: .bottom
         )
         .onAppear {
-            if isSharing {
+            if isListening {
                 startPulsing()
             }
         }
-        .onChange(of: isSharing) { newValue in
+        .onChange(of: isListening) { oldValue, newValue in
             if newValue {
                 startPulsing()
             } else {
@@ -120,10 +119,10 @@ struct SessionHeaderView: View {
 
 #Preview {
     SessionHeaderView(
-        isSharing: true,
-        hasPermission: true,
-        onToggleShare: {},
-        onEndSession: {}
+        isListening: true,
+        onToggleListening: {},
+        onEndSession: {},
+        onBack: {}
     )
     .frame(width: 1280, height: 56)
 }

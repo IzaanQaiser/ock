@@ -214,7 +214,6 @@ class ScreenshotCapture: ObservableObject {
             var capturedImage: NSImage?
             var frameReceived = false
             let semaphore = DispatchSemaphore(value: 0)
-            var streamReference: SCStream?
             
             let streamOutput = CaptureStreamOutput { sampleBuffer, type in
                 print("📸 ScreenshotCapture: Stream output handler called!")
@@ -265,7 +264,6 @@ class ScreenshotCapture: ObservableObject {
             // Create and start stream
             print("📸 ScreenshotCapture: Creating SCStream...")
             let stream = SCStream(filter: filter, configuration: config, delegate: nil)
-            streamReference = stream
             
             print("📸 ScreenshotCapture: Adding stream output...")
             // Use a background queue for sample handling (ScreenCaptureKit requirement)

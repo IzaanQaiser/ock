@@ -30,9 +30,8 @@ class AppViewModel: ObservableObject {
         appState = .materials
     }
     
-    func completeMaterials(_ uploadedMaterials: [UploadedMaterial]) {
-        // Create new project with materials
-        let projectName = "Project \(projects.count + 1)"
+    func completeMaterials(_ uploadedMaterials: [UploadedMaterial], projectName: String) {
+        // Create new project with materials and custom name
         var newProject = Project(name: projectName, materials: uploadedMaterials)
         newProject.updatedAt = Date()
         
