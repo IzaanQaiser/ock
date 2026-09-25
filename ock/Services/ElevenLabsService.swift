@@ -16,7 +16,7 @@ class ElevenLabsService: NSObject, ObservableObject {
     // API Configuration
             private var apiKey: String {
                 get {
-                    UserDefaults.standard.string(forKey: "elevenlabs_api_key") ?? "YOUR_ELEVENLABS_API_KEY_HERE"
+                    UserDefaults.standard.string(forKey: "elevenlabs_api_key") ?? ""
                 }
                 set {
                     UserDefaults.standard.set(newValue, forKey: "elevenlabs_api_key")
@@ -33,11 +33,6 @@ class ElevenLabsService: NSObject, ObservableObject {
     
     private override init() {
         super.init()
-        // Initialize with placeholder API key if not set (user should set their own key)
-        if UserDefaults.standard.string(forKey: "elevenlabs_api_key") == nil {
-            UserDefaults.standard.set("***REMOVED***", forKey: "elevenlabs_api_key")
-            print("⚠️ ElevenLabsService: Using placeholder API key. Please set your ElevenLabs API key.")
-        }
     }
     
     /// Set the ElevenLabs API key

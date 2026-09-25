@@ -10,14 +10,15 @@ import SwiftUI
 @main
 struct OckCursorApp: App {
     init() {
-        // Set API keys FIRST (before any service initialization)
-        print("🚀 OckCursorApp: Setting API keys...")
-        GeminiService.shared.setAPIKey(GEMINI_API_KEY)
-        ElevenLabsService.shared.setAPIKey(ELEVEN_LABS_API_KEY)
-        
-        // Verify Gemini key was set correctly
-        let verifiedKey = GeminiService.shared.getCurrentAPIKey()
-        print("🔑 OckCursorApp: Verified Gemini key: \(String(verifiedKey.prefix(20)))...")
+        // Load development credentials from the process environment. Never
+        // hardcode keys in source or print any portion of them to the logs.
+        let environment = ProcessInfo.processInfo.environment
+        if let geminiKey = environment["GEMINI_API_KEY"], !geminiKey.isEmpty {
+            GeminiService.shared.setAPIKey(geminiKey)
+        }
+        if let elevenLabsKey = environment["ELEVEN_LABS_API_KEY"], !elevenLabsKey.isEmpty {
+            ElevenLabsService.shared.setAPIKey(elevenLabsKey)
+        }
         
         // Request screen recording permission on app startup
         print("🚀 OckCursorApp: App initializing, requesting screen recording permission...")

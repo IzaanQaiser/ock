@@ -116,9 +116,7 @@ class GeminiService: ObservableObject {
     /// Get the current API key (for debugging)
     func getCurrentAPIKey() -> String {
         // Always read directly from UserDefaults (no caching)
-        let currentKey = UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
-        print("🔑 GeminiService: Current API key from UserDefaults: \(String(currentKey.prefix(20)))...")
-        return currentKey
+        UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
     }
     
     /// Generate content using Gemini API with text and optional image
@@ -130,7 +128,6 @@ class GeminiService: ObservableObject {
     func generateContent(text: String, imageBase64: String? = nil, mimeType: String = "image/jpeg") async throws -> String {
         // Always read directly from UserDefaults to ensure we get the latest key (no caching)
         let currentApiKey = UserDefaults.standard.string(forKey: "gemini_api_key") ?? ""
-        print("🔑 GeminiService: Using API key from UserDefaults: \(String(currentApiKey.prefix(20)))...")
         guard !currentApiKey.isEmpty else {
             print("   ⚠️ API key is empty! Make sure it's set in OckCursorApp.init()")
             throw GeminiError.apiKeyNotSet
