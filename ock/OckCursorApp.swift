@@ -12,8 +12,8 @@ struct OckCursorApp: App {
     init() {
         // Set API keys FIRST (before any service initialization)
         print("🚀 OckCursorApp: Setting API keys...")
-        GeminiService.shared.setAPIKey("***REMOVED***")
-        ElevenLabsService.shared.setAPIKey("***REMOVED***")
+        GeminiService.shared.setAPIKey(GEMINI_API_KEY)
+        ElevenLabsService.shared.setAPIKey(ELEVEN_LABS_API_KEY)
         
         // Verify Gemini key was set correctly
         let verifiedKey = GeminiService.shared.getCurrentAPIKey()
